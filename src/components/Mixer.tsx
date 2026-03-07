@@ -85,9 +85,9 @@ const Mixer: React.FC = () => {
         <button
           className={`transport-btn play ${isPlaying ? "active-play" : ""}`}
           onClick={togglePlay}
-          disabled={!isReady}
+          disabled={!isReady} // Button stays disabled until CDN responds
         >
-          {isPlaying ? "Ⅱ" : "▶"}
+          {isReady ? (isPlaying ? "Ⅱ" : "▶") : "..."}
         </button>
       </div>
 

@@ -33,6 +33,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
         inst: selectedSong.stems.inst,
       },
       () => {
+        console.log("All CDN Stems Loaded");
         setIsReady(true);
       },
     ).toDestination();
