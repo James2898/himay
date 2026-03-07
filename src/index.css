@@ -1,68 +1,366 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --bg-color: #0d0d0d;
+  --studio-gray: #1a1a1b;
+  --fader-slot: #000000;
+  --neon-accent: #58cced;
+  --tape-yellow: #f1eec9;
+  --text-dim: #888;
+
+  font-family: "Inter", system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
+  background-color: var(--bg-color);
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  justify-content: center;
+  align-items: center;
+  max-height: 100%;
+  color: white;
+  overflow: hidden;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+/* Mixer Container - The "Frame" of the app */
+.mixer-container {
+  background: var(--studio-gray);
+  padding: 24px;
+  border-radius: 16px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+  border: 2px solid #222;
+  width: 100vh;
+  max-width: 420px; /* Perfect for mobile and compact desktop */
+  box-sizing: border-box;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+/* Header Section: Logo + Select on one line */
+.mixer-header-inline {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.logo {
+  font-family: "Arial Black", sans-serif;
+  font-size: 2rem;
+  letter-spacing: -1px;
+  color: var(--neon-accent);
+  margin: 0;
+  text-shadow: 0 0 8px rgba(88, 204, 237, 0.3);
+}
+
+.song-picker {
+  background: #252525;
+  color: white;
+  border: 1px solid #444;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  max-width: 180px;
+}
+
+/* Transport Controls: Centered Play/Stop */
+.transport-center {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+/* Base Transport Button */
+.transport-btn {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: white;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.transport-btn.active-play {
+  background: var(--neon-accent);
+  color: #000; /* Dark icon on bright background */
+  border-color: #fff;
+  box-shadow:
+    0 0 20px var(--neon-accent),
+    0 0 40px rgba(88, 204, 237, 0.4);
+  transform: scale(1.05); /* Slight pop when playing */
+}
+.transport-btn.stop:hover {
+  border-color: #ff4444;
+  box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+  color: #ff4444;
+}
+
+.transport-btn:hover:not(:disabled) {
+  background: #333;
+  border-color: var(--neon-accent);
+}
+
+.transport-btn.active {
+  box-shadow: 0 0 12px var(--neon-accent);
+  color: var(--neon-accent);
+}
+
+/* Seeker: Full Width Progress Bar */
+.seeker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.time {
+  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  color: var(--neon-accent);
+  min-width: 35px;
+}
+
+.seeker-bar {
+  flex-grow: 1;
+  height: 4px;
+  appearance: none;
+  background: #333;
+  border-radius: 2px;
+  accent-color: var(--neon-accent);
+}
+
+/* Console Bed: Holds stems and master */
+.console-bed {
+  background: #111; /* Darken console background to enhance glow contrast */
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+/* Stems Row: 4 Vertical Faders */
+.stems-container {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.channel-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Use a subtle transparent background so the glow bleeds through */
+  background: linear-gradient(
+    180deg,
+    rgba(30, 30, 32, 0.6) 0%,
+    rgba(20, 20, 22, 0.8) 100%
+  );
+  padding: 10px 0;
+  border-radius: 4px;
+  border: 1px solid #222;
+  transition:
+    opacity 0.3s,
+    filter 0.3s;
+}
+
+/* The Vertical Fader Hack */
+.fader-track {
+  height: 200px; /* Increased height for longer fader throw */
+  width: 40px; /* Narrow width for the strip */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+/* 1. Track Glow Implementation */
+.fader-track.glow-track {
+  height: 180px;
+  width: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  /* THE MAGIC: Uses the inline variable defined in TSX */
+  box-shadow: 0 0 15px var(--glow-color);
+  border-radius: 4px;
+  /* Ensures the glow doesn't overwhelm the space */
+  margin: 0 2px;
+  transition: box-shadow 0.3s;
+}
+
+.fader-input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 200px; /* This must match .fader-track height */
+  height: 4px;
+  background: #000;
+  /* Rotate around center, translate ensures it stays inside the track */
+  transform: rotate(-90deg);
+  outline: none;
+  border-radius: 2px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.fader-input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 28px;
+  height: 44px;
+  background: #3a3a3a;
+  border: 1px solid #555;
+  border-radius: 3px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+  background-image: linear-gradient(
+    90deg,
+    transparent 45%,
+    #222 45%,
+    #222 55%,
+    transparent 55%
+  );
+}
+
+.mute-btn {
+  margin-top: 10px;
+  width: 90%;
+  font-size: 0.6rem;
+  font-weight: 900;
+  padding: 4px 0;
+  border: none;
+  cursor: pointer;
+  font-family: "Courier New", monospace;
+  transform: rotate(-1deg);
+  /* Default unmuted "lights on" appearance */
+  background: var(--tape-yellow);
+  color: #000;
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s;
+}
+
+.mute-btn.active-glow {
+  /* Dynamic: The button glows with the track's color too */
+  background: var(--glow-color);
+  color: white; /* Bright text when glowing */
+  font-weight: bold;
+  box-shadow: 0 0 15px var(--glow-color);
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+}
+
+.channel-strip.muted {
+  opacity: 0.3; /* Increased dimming for better contrast */
+  filter: grayscale(0.9);
+}
+
+.channel-strip.muted .glow-track {
+  box-shadow: none; /* Kill track glow when muted */
+}
+
+.channel-strip.muted .mute-btn {
+  background: #444; /* Dark gray tape when muted */
+  color: #888;
+  box-shadow: none;
+  transform: rotate(0deg); /* Optional: straighten tape when muted */
+}
+
+.fader-input::-webkit-slider-thumb {
+  background: #eee; /* Brighter thumb to catch the neon light */
+  border: 1px solid #fff;
+  /* ... existing styles ... */
+}
+
+/* Master Row: Horizontal Fader beneath stems */
+.master-row-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #111;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.master-label-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px; /* Prevents layout shifting when numbers change */
+  gap: 4px;
+}
+
+.master-label {
+  background: #ddd;
+  color: #000;
+  font-size: 0.65rem;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 2px;
+  font-family: monospace;
+}
+
+.master-horizontal-fader {
+  flex-grow: 1;
+  height: 6px;
+  appearance: none;
+  background: var(--fader-slot);
+  border-radius: 3px;
+  outline: none;
+}
+
+.master-horizontal-fader::-webkit-slider-thumb {
+  appearance: none;
+  width: 34px;
+  height: 18px;
+  background: #555;
+  border: 1px solid #777;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.volume-value {
+  font-family: "Courier New", monospace;
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: var(--neon-accent);
+  text-shadow: 0 0 5px var(--neon-accent);
+  background: #000;
+  padding: 2px 4px;
+  border-radius: 2px;
+  border: 1px solid #333;
+}
+
+.master-horizontal-fader {
+  flex-grow: 1;
+}
+
+.track-readout {
+  font-family: "Courier New", monospace;
+  font-size: 0.65rem;
+  font-weight: 900;
+  background: #000;
+  width: 80%;
+  text-align: center;
+  padding: 2px 0;
+  margin-bottom: 8px;
+  border-radius: 2px;
+  border: 1px solid #333;
+  /* Glow is handled by inline style in TSX */
+}
+
+.channel-strip {
+  min-height: 260px;
+  justify-content: flex-end; /* Keeps the bottom buttons aligned */
+}
+
+.footer-credits {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-dim);
 }
