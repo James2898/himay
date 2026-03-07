@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import * as Tone from "tone";
 import type { Song, Stem } from "../types";
+import { getCachedUrl } from "../utils/audioCache";
 
 // Constant to avoid TypeScript 'urls' property errors and for clean iteration
 const STEM_KEYS: (keyof Stem)[] = ["vocals", "drums", "bass", "inst"];
@@ -13,33 +14,70 @@ export const useAudioEngine = (selectedSong: Song | null) => {
 
   // 1. Initialize / Load Song Stems
   useEffect(() => {
-    if (!selectedSong) return;
-
-    setIsReady(false);
-    setIsPlaying(false);
-    Tone.getTransport().stop();
-    Tone.getTransport().seconds = 0;
-
-    // Clean up previous players to prevent memory leaks
-    if (players.current) {
-      players.current.dispose();
+    if (!selectedSong) {
+      setIsReady(false);
+      return;
     }
 
-    players.current = new Tone.Players(
-      {
-        vocals: selectedSong.stems.vocals,
-        drums: selectedSong.stems.drums,
-        bass: selectedSong.stems.bass,
-        inst: selectedSong.stems.inst,
-      },
-      () => {
-        console.log("All CDN Stems Loaded");
-        setIsReady(true);
-      },
-    ).toDestination();
+    let isMounted = true;
+
+    const loadStems = async () => {
+      console.log("1. Starting loadStems");
+      setIsReady(false);
+
+      // Define the actual loading logic as a reusable helper
+      const executeLoad = async (
+        stems: Record<string, string>,
+        isRetry = false,
+      ) => {
+        if (players.current) players.current.dispose();
+
+        const newPlayers = new Tone.Players().toDestination();
+
+        try {
+          for (const key of STEM_KEYS) {
+            console.log(`- ${isRetry ? "Retry" : "Load"} ${key}...`);
+            await newPlayers.add(key, stems[key]);
+          }
+
+          await Tone.loaded();
+
+          if (isMounted) {
+            players.current = newPlayers;
+            console.log("5. SUCCESS: Engine Ready");
+            setIsReady(true);
+          }
+        } catch (err) {
+          if (!isRetry) {
+            console.warn("Cache load failed, trying raw CDN...");
+            await executeLoad(selectedSong.stems, true); // Fallback to original stems
+          } else {
+            console.error("CDN Fallback also failed:", err);
+          }
+        }
+      };
+
+      try {
+        console.log("2. Resolving URLs...");
+        const cachedStems = {
+          vocals: await getCachedUrl(selectedSong.stems.vocals),
+          drums: await getCachedUrl(selectedSong.stems.drums),
+          bass: await getCachedUrl(selectedSong.stems.bass),
+          inst: await getCachedUrl(selectedSong.stems.inst),
+        };
+
+        console.log("3. Attempting cache/blob load...");
+        await executeLoad(cachedStems);
+      } catch (err: any) {
+        console.log("Outer Catch: Attempting raw CDN fallback...");
+        await executeLoad(selectedSong.stems, true);
+      }
+    };
+
+    loadStems();
 
     return () => {
-      players.current?.dispose();
+      isMounted = false;
     };
   }, [selectedSong]);
 
@@ -60,24 +98,38 @@ export const useAudioEngine = (selectedSong: Song | null) => {
 
   // 3. Playback Controls
   const togglePlay = useCallback(async () => {
-    const context = Tone.getContext();
-    if (context.state !== "running") {
-      await Tone.start();
+    if (!isReady || !players.current) {
+      console.warn("Audio not ready yet");
+      return;
     }
+    try {
+      // Force Resume for iOS
+      if (Tone.getContext().state !== "running") {
+        await Tone.start();
+      }
 
-    if (isPlaying) {
-      Tone.getTransport().pause();
-      players.current?.stopAll();
-      setIsPlaying(false); // CRITICAL: Ensure state is updated to false
-    } else {
-      const startTime = Tone.getTransport().seconds;
-      STEM_KEYS.forEach((track) => {
-        players.current?.player(track).start(0, startTime);
-      });
-      Tone.getTransport().start();
-      setIsPlaying(true); // CRITICAL: Ensure state is updated to true
+      // Toggle state FIRST so the UI reflects the change immediately on touch
+      setIsPlaying((prev) => !prev);
+
+      if (!isPlaying) {
+        // Start Logic
+        const startTime = Tone.getTransport().seconds;
+        STEM_KEYS.forEach((track) => {
+          players.current?.player(track).start(0, startTime);
+        });
+        Tone.getTransport().start();
+        setIsPlaying(true);
+      } else {
+        // Stop Logic
+        Tone.getTransport().pause();
+        players.current?.stopAll();
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      console.error("Playback failed on mobile:", error);
+      setIsPlaying(false);
     }
-  }, [isPlaying]);
+  }, [isPlaying, isReady]);
 
   // Also update stopPlay to clear the glow
   const stopPlay = useCallback(() => {
@@ -108,20 +160,50 @@ export const useAudioEngine = (selectedSong: Song | null) => {
   // 5. Volume & Mute Control
   const updateVolume = useCallback(
     (track: keyof Stem | "master", db: number) => {
-      if (track === "master") {
-        // Controls the final output gain of the app
-        Tone.getDestination().volume.rampTo(db, 0.1);
-      } else if (players.current?.has(track)) {
-        players.current.player(track).volume.rampTo(db, 0.1);
+      // 1. If not ready, DO NOT touch the audio params
+      if (!isReady || !players.current) return;
+
+      try {
+        if (track === "master") {
+          const dest = Tone.getDestination();
+          // Check if the volume param is actually accessible
+          if (dest && dest.volume && dest.volume.rampTo) {
+            dest.volume.rampTo(db, 0.1);
+          }
+        } else {
+          // Ensure player exists before accessing volume
+          if (players.current.has(track)) {
+            const p = players.current.player(track);
+            if (p && p.volume && p.volume.rampTo) {
+              p.volume.rampTo(db, 0.1);
+            }
+          }
+        }
+      } catch (e) {
+        // Catching the AudioParam error here prevents the UI from freezing
+        console.warn("Suppressed AudioParam error during transition.");
       }
     },
-    [],
+    [isReady], // This ensures the function knows when the engine is locked
   );
 
   const toggleMute = useCallback((track: keyof Stem, shouldMute: boolean) => {
     if (players.current?.has(track)) {
       players.current.player(track).mute = shouldMute;
     }
+  }, []);
+
+  useEffect(() => {
+    const unlock = async () => {
+      if (Tone.getContext().state !== "running") {
+        await Tone.start();
+        console.log("Audio Context Unlocked");
+      }
+    };
+
+    // Listen for the very first touch on the phone screen
+    window.addEventListener("touchstart", unlock, { once: true });
+    return () => window.removeEventListener("touchstart", unlock);
   }, []);
 
   return {

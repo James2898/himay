@@ -46,7 +46,12 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({
           step="1"
           defaultValue="-10"
           className="fader-input"
-          onChange={handleSliderChange}
+          onChange={(e) => {
+            if (!isMuted) {
+              // Only update if not muted
+              onVolumeChange(trackId, parseFloat(e.target.value));
+            }
+          }}
           disabled={isMuted}
         />
       </div>

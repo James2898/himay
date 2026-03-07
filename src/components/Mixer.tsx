@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import ChannelStrip from "./ChannelStrip";
 import { useAudioEngine } from "../hooks/useAudioEngine";
 import type { Song, Stem } from "../types";
+import { cacheSongStems } from "../utils/audioCache";
 
 const TRACK_COLORS: Record<keyof Stem, string> = {
   vocals: "#ff0055", // Neon Pink
@@ -12,6 +13,7 @@ const TRACK_COLORS: Record<keyof Stem, string> = {
 
 const Mixer: React.FC = () => {
   const [songs, setSongs] = useState<Song[]>([]);
+  const [isCached, setIsCached] = useState<boolean>(false);
   const [selectedSong, setSelectedSong] = useState<Song | null>(null);
   const [masterVolume, setMasterVolume] = useState<number>(0);
   const [mutedTracks, setMutedTracks] = useState<Record<keyof Stem, boolean>>({
@@ -20,6 +22,37 @@ const Mixer: React.FC = () => {
     bass: false,
     inst: false,
   });
+
+  const checkCacheStatus = async (stems: Stem) => {
+    // 1. Guard against missing Cache API
+    if (typeof window === "undefined" || !window.caches) {
+      console.warn(
+        "Cache API not supported in this browser context (check HTTPS)",
+      );
+      setIsCached(false);
+      return;
+    }
+
+    try {
+      if (!stems) return;
+      const cache = await caches.open("himay-stems-v1");
+      const urls = Object.values(stems);
+      const matches = await Promise.all(urls.map((url) => cache.match(url)));
+      setIsCached(matches.every((match) => match !== undefined));
+    } catch (error) {
+      console.error("Cache check failed:", error);
+      setIsCached(false);
+    }
+  };
+
+  // Trigger cache check whenever the selected song changes
+  useEffect(() => {
+    if (selectedSong) {
+      checkCacheStatus(selectedSong.stems);
+    } else {
+      setIsCached(false);
+    }
+  }, [selectedSong]);
 
   const {
     isReady,
@@ -32,11 +65,41 @@ const Mixer: React.FC = () => {
     toggleMute,
   } = useAudioEngine(selectedSong);
 
+  // Load song list on mount
   useEffect(() => {
     fetch("/songs.json")
       .then((res) => res.json())
-      .then((data) => setSongs(data));
+      .then((data) => setSongs(data))
+      .catch((err) => console.error("Manifest load error:", err));
   }, []);
+
+  const handleSongChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const songId = e.target.value;
+    const song = songs.find((s) => s.id === songId) || null;
+
+    setSelectedSong(song);
+
+    stopPlay();
+
+    if (song) {
+      checkCacheStatus(song.stems).catch(console.error);
+    } else {
+      setIsCached(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (selectedSong) {
+      try {
+        // Option 1 casting
+        const stems = selectedSong.stems as unknown as Record<string, string>;
+        await cacheSongStems(stems);
+        alert(`${selectedSong.title} is now available offline!`);
+      } catch (error) {
+        alert("Failed to save song. Check connection.");
+      }
+    }
+  };
 
   const handleToggleMute = (trackId: keyof Stem) => {
     const newState = !mutedTracks[trackId];
@@ -62,9 +125,8 @@ const Mixer: React.FC = () => {
         <h1 className="logo">HIMAY</h1>
         <select
           className="song-picker"
-          onChange={(e) =>
-            setSelectedSong(songs.find((s) => s.id === e.target.value) || null)
-          }
+          onChange={handleSongChange}
+          value={selectedSong?.id || ""}
         >
           <option value="">Select Song...</option>
           {songs.map((s) => (
@@ -75,23 +137,32 @@ const Mixer: React.FC = () => {
         </select>
       </header>
 
-      {/* LINE 2: Transport Centered */}
       <div className="transport-center">
-        <button className="transport-btn stop" onClick={stopPlay}>
+        <button
+          className={`transport-btn download ${isCached ? "cached" : ""}`}
+          onClick={handleDownload}
+          title={isCached ? "Saved Offline" : "Save Offline"}
+          disabled={!selectedSong || !isReady || isCached}
+        >
+          {isCached ? "✓" : "↓"}
+        </button>
+        <button
+          className="transport-btn stop"
+          onClick={stopPlay}
+          disabled={!isReady}
+        >
           ■
         </button>
 
-        {/* The 'active-play' class is added when music is currently playing */}
         <button
           className={`transport-btn play ${isPlaying ? "active-play" : ""}`}
           onClick={togglePlay}
-          disabled={!isReady} // Button stays disabled until CDN responds
+          disabled={!isReady || !selectedSong}
         >
-          {isReady ? (isPlaying ? "Ⅱ" : "▶") : "..."}
+          {!selectedSong ? "▶" : isReady ? (isPlaying ? "Ⅱ" : "▶") : "..."}
         </button>
       </div>
 
-      {/* LINE 3: Seeker Full Width */}
       <div className="seeker-row">
         <span className="time">{formatTime(currentTime)}</span>
         <input
@@ -108,7 +179,6 @@ const Mixer: React.FC = () => {
         </span>
       </div>
 
-      {/* CONSOLE: Stems Top, Master Bottom */}
       <div className="console-bed">
         <div className="stems-container">
           {(["vocals", "drums", "bass", "inst"] as (keyof Stem)[]).map((id) => (
@@ -119,7 +189,6 @@ const Mixer: React.FC = () => {
               isMuted={mutedTracks[id]}
               onToggleMute={handleToggleMute}
               onVolumeChange={updateVolume}
-              /* Pass the unique color down */
               trackColor={TRACK_COLORS[id]}
             />
           ))}
@@ -128,9 +197,8 @@ const Mixer: React.FC = () => {
         <div className="master-row-container">
           <div className="master-label-wrapper">
             <span className="master-label">MASTER</span>
-            {/* Dynamic Value Display */}
             <span className="volume-value">
-              {masterVolume > -60 ? `${masterVolume.toFixed(1)}dB` : "-∞"}
+              {masterVolume > -60 ? `${masterVolume.toFixed(0)}dB` : "-∞"}
             </span>
           </div>
           <input
