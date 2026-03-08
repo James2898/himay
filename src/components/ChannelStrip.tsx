@@ -49,7 +49,7 @@ const ChannelStrip: React.FC<ChannelStripProps> = ({
           onChange={(e) => {
             if (!isMuted) {
               // Only update if not muted
-              onVolumeChange(trackId, parseFloat(e.target.value));
+              handleSliderChange(e);
             }
           }}
           disabled={isMuted}
