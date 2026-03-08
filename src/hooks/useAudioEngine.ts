@@ -50,7 +50,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
         } catch (err) {
           if (!isRetry) {
             console.warn("Cache load failed, trying raw CDN...");
-            await executeLoad(selectedSong.stems, true); // Fallback to original stems
+            // await executeLoad(selectedSong.stems, true); // Fallback to original stems
           } else {
             console.error("CDN Fallback also failed:", err);
           }
@@ -70,7 +70,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
         await executeLoad(cachedStems);
       } catch (err: any) {
         console.log("Outer Catch: Attempting raw CDN fallback...");
-        await executeLoad(selectedSong.stems, true);
+        // await executeLoad(selectedSong.stems, true);
       }
     };
 
