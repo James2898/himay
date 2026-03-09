@@ -1,0 +1,62 @@
+/* ============================================================
+  GROUP 5: MasterRow.css (or part of Mixer.css)
+  Main output controls
+   ============================================================ */
+.master-row-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #111;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #333;
+}
+
+.master-label-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 60px;
+  gap: 4px;
+}
+
+.master-label {
+  background: #ddd;
+  color: #000;
+  font-size: 0.65rem;
+  font-weight: 900;
+  padding: 3px 8px;
+  border-radius: 2px;
+  font-family: monospace;
+}
+
+.master-horizontal-fader {
+  flex-grow: 1;
+  height: 6px;
+  appearance: none;
+  background: var(--fader-slot);
+  border-radius: 3px;
+  outline: none;
+}
+
+.master-horizontal-fader::-webkit-slider-thumb {
+  appearance: none;
+  width: 34px;
+  height: 18px;
+  background: #555;
+  border: 1px solid #777;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.volume-value {
+  font-family: "Courier New", monospace;
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: var(--neon-accent);
+  text-shadow: 0 0 5px var(--neon-accent);
+  background: #000;
+  padding: 2px 4px;
+  border-radius: 2px;
+  border: 1px solid #333;
+}
