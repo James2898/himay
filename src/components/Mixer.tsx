@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from "react";
+import * as React from "react";
 import ChannelStrip from "./ChannelStrip";
 import { useAudioEngine } from "../hooks/useAudioEngine";
 import type { Song, Stem } from "../types";
-import { cacheSongStems } from "../utils/audioCache";
+import { cacheSongStems, getCachedUrl } from "../utils/audioCache";
+import ChordMonitor from "./ChordMonitor";
 
 const TRACK_COLORS: Record<keyof Stem, string> = {
   vocals: "#ff0055", // Neon Pink
@@ -11,20 +12,45 @@ const TRACK_COLORS: Record<keyof Stem, string> = {
   inst: "#ff9900", // Neon Orange
 };
 
+const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
 const Mixer: React.FC = () => {
-  const [songs, setSongs] = useState<Song[]>([]);
-  const [isCached, setIsCached] = useState<boolean>(false);
-  const [selectedSong, setSelectedSong] = useState<Song | null>(null);
-  const [masterVolume, setMasterVolume] = useState<number>(0);
-  const [mutedTracks, setMutedTracks] = useState<Record<keyof Stem, boolean>>({
+  const [songs, setSongs] = React.useState<Song[]>([]);
+  const [selectedSong, setSelectedSong] = React.useState<Song | null>(null);
+  const [songKey, setSelectedSongKey] = React.useState<string>("");
+  const [isCached, setIsCached] = React.useState<boolean>(false);
+  const [masterVolume, setMasterVolume] = React.useState<number>(0);
+  const [mutedTracks, setMutedTracks] = React.useState<
+    Record<keyof Stem, boolean>
+  >({
     vocals: false,
     drums: false,
     bass: false,
     inst: false,
   });
 
+  const {
+    isReady,
+    isPlaying,
+    currentTime,
+    transpose,
+    togglePlay,
+    stopPlay,
+    seekTo,
+    updateVolume,
+    toggleMute,
+    changePitch,
+  } = useAudioEngine(selectedSong);
+
+  // Load song list on mount
+  React.useEffect(() => {
+    fetch("/songs.json")
+      .then((res) => res.json())
+      .then((data) => setSongs(data))
+      .catch((err) => console.error("Manifest load error:", err));
+  }, []);
+
   const checkCacheStatus = async (stems: Stem) => {
-    // 1. Guard against missing Cache API
     if (typeof window === "undefined" || !window.caches) {
       console.warn(
         "Cache API not supported in this browser context (check HTTPS)",
@@ -34,7 +60,9 @@ const Mixer: React.FC = () => {
     }
 
     try {
-      if (!stems) return;
+      if (!stems) {
+        return;
+      }
       const cache = await caches.open("himay-stems-v1");
       const urls = Object.values(stems);
       const matches = await Promise.all(urls.map((url) => cache.match(url)));
@@ -46,32 +74,105 @@ const Mixer: React.FC = () => {
   };
 
   // Trigger cache check whenever the selected song changes
-  useEffect(() => {
+  React.useEffect(() => {
     if (selectedSong) {
       checkCacheStatus(selectedSong.stems);
+      setSelectedSongKey(selectedSong.key);
     } else {
       setIsCached(false);
     }
   }, [selectedSong]);
 
-  const {
-    isReady,
-    isPlaying,
-    currentTime,
-    togglePlay,
-    stopPlay,
-    seekTo,
-    updateVolume,
-    toggleMute,
-  } = useAudioEngine(selectedSong);
+  const handleChordScan = React.useCallback(
+    async (updateProgress: (p: number) => void) => {
+      if (!selectedSong) return null;
 
-  // Load song list on mount
-  useEffect(() => {
-    fetch("/songs.json")
-      .then((res) => res.json())
-      .then((data) => setSongs(data))
-      .catch((err) => console.error("Manifest load error:", err));
-  }, []);
+      try {
+        const instUrl = await getCachedUrl(selectedSong.stems.bass);
+        const response = await fetch(instUrl);
+        const arrayBuffer = await response.arrayBuffer();
+        const audioCtx =
+          new // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+        audioCtx.close();
+
+        const duration = audioBuffer.duration;
+        const sampleRate = audioBuffer.sampleRate;
+        const stepSize = 0.25; // High resolution scanning (250ms)
+        const chordMap: { time: number; label: string }[] = [];
+
+        // PERSISTENCE LOGIC
+        let currentVote = "";
+        let voteCounter = 0;
+        const REQUIRED_VOTES = 2; // Reduced to 0.5s to capture faster tempo changes
+
+        for (let t = 0; t < duration; t += stepSize) {
+          const startSample = Math.floor(t * sampleRate);
+          const chunk = audioBuffer
+            .getChannelData(0)
+            .slice(startSample, startSample + 4096);
+
+          let maxAmp = 0;
+          let maxIdx = 0;
+          for (let i = 0; i < chunk.length; i++) {
+            const amp = Math.abs(chunk[i]);
+            if (amp > maxAmp) {
+              maxAmp = amp;
+              maxIdx = i;
+            }
+          }
+
+          const freq = maxIdx * (sampleRate / chunk.length);
+          const midi = Math.round(12 * Math.log2(freq / 440) + 69);
+
+          // Lower threshold (0.01) to detect quieter notes
+          const detectedLabel = maxAmp > 0.01 ? NOTES[midi % 12] : "--";
+
+          // VOTING SYSTEM
+          if (detectedLabel === currentVote) {
+            voteCounter++;
+          } else {
+            currentVote = detectedLabel;
+            voteCounter = 1;
+          }
+
+          // Commit logic: Capture the change once stability is reached
+          if (voteCounter === REQUIRED_VOTES) {
+            if (
+              chordMap.length === 0 ||
+              chordMap[chordMap.length - 1].label !== currentVote
+            ) {
+              // Register chord at the timestamp where the note started being stable
+              const startTime = t - stepSize * (REQUIRED_VOTES - 1);
+              chordMap.push({
+                time: Math.max(0, startTime),
+                label: currentVote,
+              });
+            }
+          }
+
+          updateProgress(Math.round((t / duration) * 100));
+
+          // Yield for UI thread responsiveness
+          if (Math.floor(t / stepSize) % 40 === 0) {
+            await new Promise((r) => setTimeout(r, 0));
+          }
+        }
+
+        // Fallback: If map is empty (e.g. very dynamic song), return at least the first detected note
+        if (chordMap.length === 0 && currentVote !== "") {
+          chordMap.push({ time: 0, label: currentVote });
+        }
+
+        return chordMap;
+      } catch (err) {
+        console.error("Scanner Bridge Error:", err);
+        throw err;
+      }
+    },
+    [selectedSong],
+  );
 
   const handleSongChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const songId = e.target.value;
@@ -88,22 +189,48 @@ const Mixer: React.FC = () => {
     }
   };
 
+  const handlePitchChange = (transpose: number) => {
+    if (!selectedSong) {
+      return;
+    }
+    changePitch(transpose);
+
+    const newIdx = transpose + NOTES.lastIndexOf(selectedSong?.key);
+
+    let newKey = NOTES.at(newIdx);
+
+    if (newKey === undefined) {
+      if (newIdx > 11) {
+        newKey = NOTES.at(newIdx - 12);
+      }
+    }
+
+    if (!newKey) {
+      console.log("Error on Change Key");
+      return;
+    }
+
+    setSelectedSongKey(newKey);
+  };
+
   const handleDownload = async () => {
-    if (selectedSong) {
+    if (selectedSong && !isCached) {
       try {
-        // Option 1 casting
         const stems = selectedSong.stems as unknown as Record<string, string>;
-        await cacheSongStems(stems);
         alert(`${selectedSong.title} is now available offline!`);
+        await cacheSongStems(stems);
+        setIsCached(true);
       } catch (error) {
-        alert("Failed to save song. Check connection.");
+        alert("Download failed");
+        console.log(error);
       }
     }
   };
 
   const handleToggleMute = (trackId: keyof Stem) => {
     const newState = !mutedTracks[trackId];
-    setMutedTracks((prev) => ({ ...prev, [trackId]: newState }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setMutedTracks((prev: any) => ({ ...prev, [trackId]: newState }));
     toggleMute(trackId, newState);
   };
 
@@ -179,7 +306,25 @@ const Mixer: React.FC = () => {
         </span>
       </div>
 
+      <ChordMonitor
+        songId={selectedSong?.id}
+        currentTime={currentTime}
+        transpose={transpose}
+        isReady={isReady}
+        onStartScan={handleChordScan}
+      />
+
       <div className="console-bed">
+        <div className="transpose-utility">
+          <span className="util-label">
+            PITCH: {transpose > 0 ? `+${transpose}` : transpose} KEY: {songKey}
+          </span>
+          <div className="pitch-btns">
+            <button onClick={() => handlePitchChange(transpose - 1)}>-</button>
+            <button onClick={() => handlePitchChange(0)}>RESET</button>
+            <button onClick={() => handlePitchChange(transpose + 1)}>+</button>
+          </div>
+        </div>
         <div className="stems-container">
           {(["vocals", "drums", "bass", "inst"] as (keyof Stem)[]).map((id) => (
             <ChannelStrip

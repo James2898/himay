@@ -1,0 +1,119 @@
+/* ============================================================
+  GROUP 3: Transport.css
+  Playback controls and time seeking
+  ============================================================ */
+.transport-center {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.transport-btn {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: white;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.transport-btn.active-play {
+  background: var(--neon-accent);
+  color: #000;
+  border-color: #fff;
+  box-shadow:
+    0 0 20px var(--neon-accent),
+    0 0 40px rgba(88, 204, 237, 0.4);
+  transform: scale(1.05);
+}
+
+.transport-btn.stop:hover {
+  border-color: #ff4444;
+  box-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+  color: #ff4444;
+}
+
+.transport-btn:hover:not(:disabled) {
+  background: #333;
+  border-color: var(--neon-accent);
+}
+
+.transport-btn.active {
+  box-shadow: 0 0 12px var(--neon-accent);
+  color: var(--neon-accent);
+}
+
+.transport-btn.download {
+  color: #ffcc00;
+  border-color: rgba(255, 204, 0, 0.6);
+  font-size: 1.4rem;
+  transition: all 0.4s ease;
+}
+
+.transport-btn.download:not(:disabled) {
+  background: rgba(255, 204, 0, 0.2);
+  box-shadow:
+    0 0 10px rgba(255, 204, 0, 0.5),
+    0 0 20px rgba(255, 204, 0, 0.3);
+}
+
+.transport-btn.download:hover:not(:disabled) {
+  background: rgba(255, 204, 0, 0.4);
+  color: #fff;
+  border-color: #fff;
+  box-shadow:
+    0 0 20px rgba(255, 204, 0, 0.7),
+    0 0 40px rgba(255, 204, 0, 0.5);
+  transform: scale(1.05);
+}
+
+.transport-btn.download.cached {
+  color: #00ff88;
+  border-color: #00ff88;
+  background: rgba(0, 255, 136, 0.1);
+  box-shadow:
+    0 0 15px rgba(0, 255, 136, 0.4),
+    inset 0 0 5px rgba(0, 255, 136, 0.2);
+  cursor: default;
+  opacity: 1 !important;
+  filter: none !important;
+}
+
+.transport-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  filter: grayscale(1);
+  box-shadow: none !important;
+  border-color: #333;
+}
+
+.seeker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.time {
+  font-family: "Courier New", monospace;
+  font-size: 0.75rem;
+  color: var(--neon-accent);
+  min-width: 35px;
+}
+
+.seeker-bar {
+  flex-grow: 1;
+  height: 4px;
+  appearance: none;
+  background: #333;
+  border-radius: 2px;
+  accent-color: var(--neon-accent);
+}

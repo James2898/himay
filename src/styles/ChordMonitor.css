@@ -1,0 +1,167 @@
+/* --- ChordMonitor.css --- */
+.chord-monitor-outer {
+  width: 100%;
+  margin: 15px 0;
+  position: relative;
+}
+
+/* Meta-header placed outside the box at the top right */
+.chord-meta-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding-right: 10px;
+}
+
+.live-label {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: white;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+}
+
+.reset-button {
+  background: #444;
+  border: none;
+  color: white;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+.reset-button:hover {
+  background: #666;
+}
+
+/* The black main display box */
+.chord-box-main {
+  width: 100%;
+  min-height: 140px;
+  background: rgba(10, 10, 10, 0.85);
+  backdrop-filter: blur(15px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.7);
+  position: relative;
+}
+
+.performance-layout {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+/* Current Chord centered in the box */
+.chord-primary-center {
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chord-main-text {
+  font-size: 4.5rem;
+  font-weight: 900;
+  color: white;
+  margin: 0;
+  line-height: 1;
+  /* Visual Fix: Transition makes label changes feel less abrupt */
+  transition:
+    opacity 0.2s ease-in-out,
+    transform 0.2s ease-out;
+}
+
+/* Previous Chord to the left, dimmed 75% (0.25 opacity) */
+.chord-prev-preview {
+  position: absolute;
+  left: 12%;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: white;
+  opacity: 0.25;
+  filter: blur(0.5px);
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+/* Next Chord to the right, dimmed 75% (0.25 opacity) */
+.chord-next-preview {
+  position: absolute;
+  right: 12%;
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: white;
+  opacity: 0.25;
+  filter: blur(0.5px);
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+/* Scanning / Setup States */
+.setup-view {
+  width: 80%;
+  text-align: center;
+}
+
+.gen-btn {
+  width: 100%;
+  background: transparent;
+  border: 1px dashed rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 18px;
+  border-radius: 12px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.gen-btn:hover:not(.disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  border-style: solid;
+}
+
+.gen-btn.disabled {
+  opacity: 0.15;
+  cursor: not-allowed;
+}
+
+.scanner-container {
+  width: 100%;
+}
+
+.scanner-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: white;
+  font-weight: bold;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+}
+
+.progress-track {
+  height: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #00ff88;
+  box-shadow: 0 0 10px #00ff88;
+  transition: width 0.3s ease;
+}

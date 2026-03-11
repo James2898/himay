@@ -9,5 +9,6 @@ export interface Song {
   id: string;
   title: string;
   duration: number;
+  key: string;
   stems: Stem;
 }

@@ -1,0 +1,38 @@
+/* ============================================================
+  GROUP 7: TransposeUtility.css
+  Pitch shifting interface
+   ============================================================ */
+.transpose-utility {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+}
+
+.util-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #aaa;
+}
+
+.pitch-btns {
+  display: flex;
+  gap: 10px;
+}
+
+.pitch-btns button {
+  background: #333;
+  border: none;
+  color: white;
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 12px;
+}
+
+.pitch-btns button:active {
+  background: #00ff88;
+  color: black;
+}
