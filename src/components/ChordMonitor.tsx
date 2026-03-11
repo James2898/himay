@@ -90,6 +90,14 @@ const ChordMonitor = ({
     return [...chordMap].reverse().find((c) => c.time <= currentTime);
   }, [chordMap, currentTime]);
 
+  const prevChord = React.useMemo(() => {
+    if (!chordMap.length) return null;
+    const pastChords = chordMap.filter(
+      (c) => c.time < (activeChord?.time || 0),
+    );
+    return pastChords.length > 0 ? pastChords[pastChords.length - 1] : null;
+  }, [chordMap, activeChord]);
+
   const nextChord = React.useMemo(() => {
     if (!chordMap.length) return null;
     return chordMap.find((c) => c.time > currentTime);
@@ -150,8 +158,11 @@ const ChordMonitor = ({
               </div>
             )}
 
-            {/* Beat pulse indicator positioned near the center */}
-            <div className="pulse-indicator" />
+            {prevChord && (
+              <div className="chord-prev-preview">
+                {getTransposedLabel(prevChord.label, transpose)}
+              </div>
+            )}
           </div>
         ) : (
           <div className="setup-view">

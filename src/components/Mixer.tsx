@@ -17,6 +17,7 @@ const NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const Mixer: React.FC = () => {
   const [songs, setSongs] = React.useState<Song[]>([]);
   const [selectedSong, setSelectedSong] = React.useState<Song | null>(null);
+  const [songKey, setSelectedSongKey] = React.useState<string>("");
   const [isCached, setIsCached] = React.useState<boolean>(false);
   const [masterVolume, setMasterVolume] = React.useState<number>(0);
   const [mutedTracks, setMutedTracks] = React.useState<
@@ -76,6 +77,7 @@ const Mixer: React.FC = () => {
   React.useEffect(() => {
     if (selectedSong) {
       checkCacheStatus(selectedSong.stems);
+      setSelectedSongKey(selectedSong.key);
     } else {
       setIsCached(false);
     }
@@ -86,11 +88,7 @@ const Mixer: React.FC = () => {
       if (!selectedSong) return null;
 
       try {
-        // Step A: Get the Instrument stem (best for harmony detection)
-        // Works whether song is cached (Blob URL) or remote (CDN URL)
-        const instUrl = await getCachedUrl(selectedSong.stems.inst);
-
-        // Step B: Fetch and Decode
+        const instUrl = await getCachedUrl(selectedSong.stems.bass);
         const response = await fetch(instUrl);
         const arrayBuffer = await response.arrayBuffer();
         const audioCtx =
@@ -101,10 +99,14 @@ const Mixer: React.FC = () => {
 
         const duration = audioBuffer.duration;
         const sampleRate = audioBuffer.sampleRate;
-        const stepSize = 0.5; // Analyze every half-second
+        const stepSize = 0.25; // High resolution scanning (250ms)
         const chordMap: { time: number; label: string }[] = [];
 
-        // Step C: Analysis Loop (Simplified Peak Detection for Root Notes)
+        // PERSISTENCE LOGIC
+        let currentVote = "";
+        let voteCounter = 0;
+        const REQUIRED_VOTES = 2; // Reduced to 0.5s to capture faster tempo changes
+
         for (let t = 0; t < duration; t += stepSize) {
           const startSample = Math.floor(t * sampleRate);
           const chunk = audioBuffer
@@ -123,22 +125,44 @@ const Mixer: React.FC = () => {
 
           const freq = maxIdx * (sampleRate / chunk.length);
           const midi = Math.round(12 * Math.log2(freq / 440) + 69);
-          const label = maxAmp > 0.02 ? NOTES[midi % 12] : "--";
 
-          if (
-            chordMap.length === 0 ||
-            chordMap[chordMap.length - 1].label !== label
-          ) {
-            chordMap.push({ time: t, label });
+          // Lower threshold (0.01) to detect quieter notes
+          const detectedLabel = maxAmp > 0.01 ? NOTES[midi % 12] : "--";
+
+          // VOTING SYSTEM
+          if (detectedLabel === currentVote) {
+            voteCounter++;
+          } else {
+            currentVote = detectedLabel;
+            voteCounter = 1;
           }
 
-          // Update UI Progress
+          // Commit logic: Capture the change once stability is reached
+          if (voteCounter === REQUIRED_VOTES) {
+            if (
+              chordMap.length === 0 ||
+              chordMap[chordMap.length - 1].label !== currentVote
+            ) {
+              // Register chord at the timestamp where the note started being stable
+              const startTime = t - stepSize * (REQUIRED_VOTES - 1);
+              chordMap.push({
+                time: Math.max(0, startTime),
+                label: currentVote,
+              });
+            }
+          }
+
           updateProgress(Math.round((t / duration) * 100));
 
-          // Yield to browser to prevent UI lock on older Androids
-          if (Math.floor(t / stepSize) % 20 === 0) {
+          // Yield for UI thread responsiveness
+          if (Math.floor(t / stepSize) % 40 === 0) {
             await new Promise((r) => setTimeout(r, 0));
           }
+        }
+
+        // Fallback: If map is empty (e.g. very dynamic song), return at least the first detected note
+        if (chordMap.length === 0 && currentVote !== "") {
+          chordMap.push({ time: 0, label: currentVote });
         }
 
         return chordMap;
@@ -163,6 +187,30 @@ const Mixer: React.FC = () => {
     } else {
       setIsCached(false);
     }
+  };
+
+  const handlePitchChange = (transpose: number) => {
+    if (!selectedSong) {
+      return;
+    }
+    changePitch(transpose);
+
+    const newIdx = transpose + NOTES.lastIndexOf(selectedSong?.key);
+
+    let newKey = NOTES.at(newIdx);
+
+    if (newKey === undefined) {
+      if (newIdx > 11) {
+        newKey = NOTES.at(newIdx - 12);
+      }
+    }
+
+    if (!newKey) {
+      console.log("Error on Change Key");
+      return;
+    }
+
+    setSelectedSongKey(newKey);
   };
 
   const handleDownload = async () => {
@@ -269,12 +317,12 @@ const Mixer: React.FC = () => {
       <div className="console-bed">
         <div className="transpose-utility">
           <span className="util-label">
-            PITCH: {transpose > 0 ? `+${transpose}` : transpose}
+            PITCH: {transpose > 0 ? `+${transpose}` : transpose} KEY: {songKey}
           </span>
           <div className="pitch-btns">
-            <button onClick={() => changePitch(transpose - 1)}>-</button>
-            <button onClick={() => changePitch(0)}>RESET</button>
-            <button onClick={() => changePitch(transpose + 1)}>+</button>
+            <button onClick={() => handlePitchChange(transpose - 1)}>-</button>
+            <button onClick={() => handlePitchChange(0)}>RESET</button>
+            <button onClick={() => handlePitchChange(transpose + 1)}>+</button>
           </div>
         </div>
         <div className="stems-container">
