@@ -45,5 +45,41 @@
       "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773243434/Don_Moen_-_Our_Father___Live_Worship_Sessions-Bass_axxtos.mp3",
       "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773243440/Don_Moen_-_Our_Father___Live_Worship_Sessions-Other_Instruments_oqjtlp.mp3"
     }
+  },
+  {
+    "id": "05",
+    "title": "For All You've Done (E)",
+    "key": "E",
+    "duration": 336,
+    "stems": {
+      "vocals": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773847872/For_All_You_ve_Done_-_Hillsong_Worship-Vocals_b7kjbn.mp3",
+      "drums": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773847863/For_All_You_ve_Done_-_Hillsong_Worship-Drums_zykqyu.mp3",
+      "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773847874/For_All_You_ve_Done_-_Hillsong_Worship-Bass_lazcsm.mp3",
+      "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773847892/For_All_You_ve_Done_-_Hillsong_Worship-Other_Instruments_onk96f.mp3"
+    }
+  },
+  {
+    "id": "06",
+    "title": "Refiner's Fire (C)",
+    "key": "C",
+    "duration": 339,
+    "stems": {
+      "vocals": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848204/Refiner_s_Fire___Vineyard_Worship___Firstborn_Band_Cover-Vocals_meuc5r.mp3",
+      "drums": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848158/Refiner_s_Fire___Vineyard_Worship___Firstborn_Band_Cover-Drums_j9g6aa.mp3",
+      "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848188/Refiner_s_Fire___Vineyard_Worship___Firstborn_Band_Cover-Bass_xuiums.mp3",
+      "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848204/Refiner_s_Fire___Vineyard_Worship___Firstborn_Band_Cover-Other_Instruments_pepjpm.mp3"
+    }
+  },
+  {
+    "id": "07",
+    "title": "At The Cross (E)",
+    "key": "E",
+    "duration": 442,
+    "stems": {
+      "vocals": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848670/At_the_Cross_-_Hillsong_Worship-Vocals_gcmwyq.mp3",
+      "drums": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848670/At_the_Cross_-_Hillsong_Worship-Drums_bjyf8a.mp3",
+      "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848669/At_the_Cross_-_Hillsong_Worship-Bass_wxdprm.mp3",
+      "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848672/At_the_Cross_-_Hillsong_Worship-Other_Instruments_wbepls.mp3"
+    }
   }
 ]
