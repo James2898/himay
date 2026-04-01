@@ -81,5 +81,17 @@
       "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848669/At_the_Cross_-_Hillsong_Worship-Bass_wxdprm.mp3",
       "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1773848672/At_the_Cross_-_Hillsong_Worship-Other_Instruments_wbepls.mp3"
     }
+  },
+  {
+    "id": "08",
+    "title": "Celebrate Jesus Celebrate + Jesus Is Alive (C)",
+    "key": "C",
+    "duration": 300,
+    "stems": {
+      "vocals": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775041172/SFBC_Praise___Worship___Celebrate_Jesus_Medley___Live_Worship_Sessions-Vocals_dgidu8.mp3",
+      "drums": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775041169/SFBC_Praise___Worship___Celebrate_Jesus_Medley___Live_Worship_Sessions-Drums_d6fnal.mp3",
+      "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775041168/SFBC_Praise___Worship___Celebrate_Jesus_Medley___Live_Worship_Sessions-Other_Instruments_ionhd8.mp3",
+      "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775041168/SFBC_Praise___Worship___Celebrate_Jesus_Medley___Live_Worship_Sessions-Bass_jte7be.mp3"
+    }
   }
 ]
