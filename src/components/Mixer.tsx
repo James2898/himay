@@ -46,7 +46,12 @@ const Mixer: React.FC = () => {
   React.useEffect(() => {
     fetch("/songs.json")
       .then((res) => res.json())
-      .then((data) => setSongs(data))
+      .then((data) => {
+        const sortedSongs = [...data].sort((a, b) =>
+          a.title.localeCompare(b.title),
+        );
+        setSongs(sortedSongs);
+      })
       .catch((err) => console.error("Manifest load error:", err));
   }, []);
 

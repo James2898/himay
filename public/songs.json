@@ -93,5 +93,29 @@
       "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775041168/SFBC_Praise___Worship___Celebrate_Jesus_Medley___Live_Worship_Sessions-Other_Instruments_ionhd8.mp3",
       "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775041168/SFBC_Praise___Worship___Celebrate_Jesus_Medley___Live_Worship_Sessions-Bass_jte7be.mp3"
     }
+  },
+  {
+    "id": "09",
+    "title": "Worthy Is The Lamb (G)",
+    "key": "G",
+    "duration": 374,
+    "stems": {
+      "vocals": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046911/Worthy_Is_The_Lamb_-_Hillsong_Worship-Vocals_c5w8x8.mp3",
+      "drums": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046909/Worthy_Is_The_Lamb_-_Hillsong_Worship-Drums_bnbaqb.mp3",
+      "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046922/Worthy_Is_The_Lamb_-_Hillsong_Worship-Bass_tchipc.mp3",
+      "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046928/Worthy_Is_The_Lamb_-_Hillsong_Worship-Other_Instruments_uifvuz.mp3"
+    }
+  },
+  {
+    "id": "10",
+    "title": "At The Cross, I Find Peace (G)",
+    "key": "G",
+    "duration": 237,
+    "stems": {
+      "vocals": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046905/At_the_cross_i_find_peace_by_David_Holland__With_Lyric_-Vocals_zzslpl.mp3",
+      "drums": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046883/At_the_cross_i_find_peace_by_David_Holland__With_Lyric_-Drums_fhfowq.mp3",
+      "bass": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046884/At_the_cross_i_find_peace_by_David_Holland__With_Lyric_-Bass_ubtw2u.mp3",
+      "inst": "https://res.cloudinary.com/dvlgcbjx1/video/upload/v1775046884/At_the_cross_i_find_peace_by_David_Holland__With_Lyric_-Other_Instruments_gvbuoc.mp3"
+    }
   }
 ]
