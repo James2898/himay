@@ -403,3 +403,23 @@ flowchart TD
 - Code to reuse:
   - Existing `CHROMATIC_SCALE` transposition logic inside `src/components/ChordMonitor.tsx`.
   - Existing stem cache configuration (`himay-stems-v1`) in `src/utils/audioCache.ts`.
+
+
+---
+
+## Design decisions (grill)
+
+- **Date:** 2026-11-20
+- **Source:** `/design-grill` session
+
+| # | Decision | Settled Answer | Source | Spec Section |
+|---|---|---|---|---|
+| **Q1.1** | **Engine Migration Strategy** | Refactor `src/hooks/useAudioEngine.ts` directly in place, maintaining its existing return interface for `src/components/Mixer.tsx`. | User (Option B) | Architecture & Scope |
+| **Q1.2** | **Master Timeline Sync** | `drums` acts as master timeline clock. If drums are delayed or missing, engine falls back to `inst`. Drift clamp runs every 100ms with a 30ms alignment threshold. | Accepted Rec (Option A) | Audio Sync & DoD |
+| **Q1.3** | **Volume & Mute Control** | Use Web Audio `GainNode.gain` per stem with `linearRampToValueAtTime` for channel faders and mutes to prevent click/zipper artifacts on mobile. | Accepted Rec (Option A) | Audio Graph Architecture |
+| **Q1.4** | **Chord Fallback Behavior** | `ChordMonitor.tsx` displays `"--"` / "No chord map" gracefully when `chords` is absent or empty. Deprecate and remove `localStorage` caching and manual scanning logic. | Accepted Rec (Option A) | User Behaviour & Cleanup |
+| **Q1.5** | **Chord Rollout Scope** | Pilot Song 01 (`Langit + Sapat Na At Higit Pa`) in Phase 1 with verified timestamps; declare `chords?: ChordEntry[]` optional in `Song` interface. | Accepted Rec (Option A) | Data Model & Rollout |
+| **Q1.6** | **Background Auto-Resume** | If Messenger WebView background suspension cannot auto-resume due to browser autoplay policies, set `isPlaying = false` (reverting button to "Play") and display a brief toast: *"Audio paused by device — tap Play to resume"*. | Accepted Rec (Option A) | Mobile UX & Resilience |
+
+### Parked Decisions
+*None. All architectural decisions resolved and settled.*
