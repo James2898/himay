@@ -129,7 +129,7 @@ N/A — no API contract required for this task.
 
 > _Copied verbatim from `context.md` → MEMORY.md Notes. This is the canonical list of past-bug prevention rules for `@fullstack-developer`, `@release-manager`, and `@validator-agent`. They MUST NOT re-read `MEMORY.md` directly; trust this list._
 
-- `MEMORY.md` does not exist in `/home/james2898/projects/himay-phase2` (`docs/structure.md` and `docs/coding-guidelines.md` are also absent; `docs/` contains only `IMPLEMENTATION_ROADMAP.md`). The primary repository `/home/james2898/projects/himay` was not read per worktree isolation directive.
+- `MEMORY.md` does not exist in the worktree (`docs/structure.md` and `docs/coding-guidelines.md` are also absent; `docs/` contains only `IMPLEMENTATION_ROADMAP.md`). The primary primary repository was not read per worktree isolation directive.
 
 ---
 
@@ -156,7 +156,7 @@ N/A — no API contract required for this task.
 ## Unresolved Pending Reconciliation
 
 - **Existing `ended`, `error`, and `transpose`-Reset Conventions:** `context.md` did not capture how the existing `src/hooks/useAudioEngine.ts` handles natural track end (`ended` — e.g. reset `currentTime` to `0` vs pause at `duration`), partial/missing stem errors, or whether `transpose` resets to `0` on song change. Developer must read `src/hooks/useAudioEngine.ts` before coding to confirm existing behavior. (Suggested grep/read target: `src/hooks/useAudioEngine.ts`)
-- **`Tone.PitchShift` Constructor Options & `Tone.connect` TypeScript Types:** `node_modules` is absent in `/home/james2898/projects/himay-phase2`, and `context.md` did not quote the exact `new Tone.PitchShift({...})` options or verify `Tone.getContext().rawContext` (`AnyAudioContext` vs `AudioContext` from `standardized-audio-context`) type compatibility with `Tone.connect(nativeGainNode, pitchShift)`. Developer must read `src/hooks/useAudioEngine.ts` for existing `PitchShift` options and run `tsc -b` to verify Tone v15 types. (Suggested grep/read target: `src/hooks/useAudioEngine.ts`, `node_modules/tone`)
+- **`Tone.PitchShift` Constructor Options & `Tone.connect` TypeScript Types:** `node_modules` is absent in the worktree, and `context.md` did not quote the exact `new Tone.PitchShift({...})` options or verify `Tone.getContext().rawContext` (`AnyAudioContext` vs `AudioContext` from `standardized-audio-context`) type compatibility with `Tone.connect(nativeGainNode, pitchShift)`. Developer must read `src/hooks/useAudioEngine.ts` for existing `PitchShift` options and run `tsc -b` to verify Tone v15 types. (Suggested grep/read target: `src/hooks/useAudioEngine.ts`, `node_modules/tone`)
 
 ---
 
@@ -219,4 +219,4 @@ N/A — no API contract required for this task.
     5. Fixed Web Audio ramp anchor clicks: reads `currentGain` before `cancelScheduledValues(now)` in both `updateVolume` and `toggleMute`.
     6. Improved `visibilitychange` error path by using `await Tone.start()` and pausing `<audio>` elements if resume fails.
     7. Handled missing song key in MediaSession album metadata and made action handlers idempotent.
-  - In accordance with the project instructions and safety guards, no git commits or autonomous branch switches were made; all files are staged in `/home/james2898/projects/himay-phase2` on branch `feature/phase2-streaming-engine`.
+  - In accordance with the project instructions and safety guards, no git commits or autonomous branch switches were made; all files are staged in the worktree on branch `feature/phase2-streaming-engine`.

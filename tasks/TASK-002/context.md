@@ -3,16 +3,16 @@
 ## Relevant Files
 | File | Why It's Relevant |
 |---|---|
-| `/home/james2898/projects/himay-phase2/src/hooks/useAudioEngine.ts` | Target file to refactor in place (`Tone.Players` -> persistent `<audio>` + `MediaElementAudioSourceNode` + split-graph routing + master-slave sync) |
-| `/home/james2898/projects/himay-phase2/src/components/Mixer.tsx` | Sole consumer of `useAudioEngine(selectedSong)`; defines exact return contract, master fader (`dB`), mute map, seeker, and song-change flow |
-| `/home/james2898/projects/himay-phase2/src/components/ChannelStrip.tsx` | Stem fader UI (`-60` to `+6` dB, default `-10` dB) and mute toggle; calls `updateVolume(trackId, db)` directly |
-| `/home/james2898/projects/himay-phase2/src/utils/audioCache.ts` | Provides `getCachedUrl(url)`; currently lacks `stemUrlManager` / `URL.revokeObjectURL` cleanup |
-| `/home/james2898/projects/himay-phase2/src/types/index.ts` | Defines `Stem` (`vocals \| drums \| bass \| inst`) and `Song` interfaces |
-| `/home/james2898/projects/himay-phase2/public/songs.json` | Song manifest (10 Cloudinary MP3 stem songs; exposes missing `key` on song `"01"` edge case) |
-| `/home/james2898/projects/himay-phase2/src/main.tsx` | Wraps `<App />` in React 19 `<StrictMode>` (double-invokes mount effects in dev) |
-| `/home/james2898/projects/himay-phase2/pbi-docs/PBI-20261120-audio-engine-optimization.md` | Authoritative Phase 2 spec & `/design-grill` decisions (`Q1.1`–`Q1.6`) |
-| `/home/james2898/projects/himay-phase2/tsconfig.app.json` | Enforces `strict`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `noUnusedLocals`, `noUnusedParameters` |
-| `/home/james2898/projects/himay-phase2/eslint.config.js` | Enforces `eslint-plugin-react-hooks` `flat.recommended` (`^7.0.1`) |
+| `src/hooks/useAudioEngine.ts` | Target file to refactor in place (`Tone.Players` -> persistent `<audio>` + `MediaElementAudioSourceNode` + split-graph routing + master-slave sync) |
+| `src/components/Mixer.tsx` | Sole consumer of `useAudioEngine(selectedSong)`; defines exact return contract, master fader (`dB`), mute map, seeker, and song-change flow |
+| `src/components/ChannelStrip.tsx` | Stem fader UI (`-60` to `+6` dB, default `-10` dB) and mute toggle; calls `updateVolume(trackId, db)` directly |
+| `src/utils/audioCache.ts` | Provides `getCachedUrl(url)`; currently lacks `stemUrlManager` / `URL.revokeObjectURL` cleanup |
+| `src/types/index.ts` | Defines `Stem` (`vocals \| drums \| bass \| inst`) and `Song` interfaces |
+| `public/songs.json` | Song manifest (10 Cloudinary MP3 stem songs; exposes missing `key` on song `"01"` edge case) |
+| `src/main.tsx` | Wraps `<App />` in React 19 `<StrictMode>` (double-invokes mount effects in dev) |
+| `pbi-docs/PBI-20261120-audio-engine-optimization.md` | Authoritative Phase 2 spec & `/design-grill` decisions (`Q1.1`–`Q1.6`) |
+| `tsconfig.app.json` | Enforces `strict`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `noUnusedLocals`, `noUnusedParameters` |
+| `eslint.config.js` | Enforces `eslint-plugin-react-hooks` `flat.recommended` (`^7.0.1`) |
 
 ## Exact Seams
 
@@ -54,7 +54,7 @@
 - **Master Volume / Split-Graph Seam (Critical Discrepancy in PBI):**
   - Currently `useAudioEngine.ts:19, 66, 72, 185` routes `drums` -> `Tone.getDestination()` and melodic stems -> `Tone.PitchShift` -> `Tone.getDestination()`, and `updateVolume("master", db)` ramps `Tone.getDestination().volume`.
   - PBI Task 2.2 prose (`line 177`) says route `drums` GainNode to `Tone.getDestination()`, **but the snippet at `line 201` writes `gain.connect(rawCtx.destination)`**. If `drums` connects to `rawCtx.destination` directly while `pitchShift` connects to `Tone.getDestination()`, `Tone.getDestination().volume` (`updateVolume("master", db)`) will **not** control `drums`! Route `drums` GainNode through `Tone.getDestination()` (or route both `drums` and `pitchShift` through a shared native master `GainNode` -> `rawCtx.destination`) so `"master"` volume controls all 4 stems.
-- **Unverified in this worktree (`node_modules` absent):** `node_modules/tone` is not installed in `/home/james2898/projects/himay-phase2`. Verify `Tone.getContext().rawContext` TypeScript type (`AnyAudioContext` vs `AudioContext` from `standardized-audio-context`) and `Tone.connect(nativeGainNode, pitchShift)` runtime/type compatibility when running `tsc -b`.
+- **Unverified in this worktree (`node_modules` absent):** `node_modules/tone` is not installed in the worktree. Verify `Tone.getContext().rawContext` TypeScript type (`AnyAudioContext` vs `AudioContext` from `standardized-audio-context`) and `Tone.connect(nativeGainNode, pitchShift)` runtime/type compatibility when running `tsc -b`.
 - **Platform / Browser Built-ins (Lean Change):** Standard Web Audio (`GainNode`, `MediaElementAudioSourceNode`, `AudioContext`), `HTMLAudioElement` (`canplaythrough`, `currentTime`, `play`, `pause`), `URL.revokeObjectURL`, `navigator.mediaSession`, and `document.visibilitychange` are all native platform APIs — zero new packages needed.
 
 ### 5. Song Switching, Seeker & StrictMode Lifecycle (`Mixer.tsx` & `main.tsx`)
@@ -83,4 +83,4 @@
 - `pbi-docs/PBI-20261120-audio-engine-optimization.md:201`: Snippet connects `drums` `GainNode` to `rawCtx.destination` instead of `Tone.getDestination()`, which would bypass `Tone.getDestination().volume` master fader control (`useAudioEngine.ts:185`) — do not replicate.
 
 ## MEMORY.md Notes
-- `MEMORY.md` does not exist in `/home/james2898/projects/himay-phase2` (`docs/structure.md` and `docs/coding-guidelines.md` are also absent; `docs/` contains only `IMPLEMENTATION_ROADMAP.md`). The primary repository `/home/james2898/projects/himay` was not read per worktree isolation directive.
+- `MEMORY.md` does not exist in the worktree (`docs/structure.md` and `docs/coding-guidelines.md` are also absent; `docs/` contains only `IMPLEMENTATION_ROADMAP.md`). The primary primary repository was not read per worktree isolation directive.
