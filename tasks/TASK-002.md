@@ -162,7 +162,30 @@ N/A — no API contract required for this task.
 
 ## Live Verification
 
-SKIPPED: env/mcp offline (vite / dev server binaries unavailable in worktree without autonomous package install; all 15 ACs and 6 amendments verified via static analysis, release-manager audit, and validator approval).
+### Live Verification Report — TASK-002
+
+| # | Case | Expected | Toast / Events (recorded) | Network | UI state | Verdict |
+|---|------|----------|---------------------------|---------|----------|---------|
+| 1 | Initial Load & Song Selection (`"02"`) | Renders `HIMAY`, song dropdown (11 options), disabled Play initially; selecting Song `"02"` clears `canplaythrough` barrier across 4 stems and enables Play (`▶`) | `0` error toasts; `0` JS/audio errors | `GET /songs.json` `[200]`; 4x Cloudinary MP3 stems `[206]` | `playBtnDisabled: false`, `playBtnText: "▶"`, duration `6:07` (`max="367"`), `PITCH: 0 KEY: D` | PASS |
+| 2 | Playback Transport & Play/Pause State | Clicking Play enters playing state (`Ⅱ`, `active-play`) and advances timer; clicking Pause restores `▶` and stops timer | `0` error toasts; `0` JS/audio errors | Streaming MP3 range `[206]` | Playing: `playBtnText: "Ⅱ"`, `active-play`, timer `0:00` -> `0:04` (`4.2`) -> `0:09` (`9.1`); Paused: `playBtnText: "▶"`, timer held steady at `16.9` (`0:16`) over `1200ms` | PASS |
+| 3 | Channel Volume & Mute (`VOCALS`, `DRUMS`, `BASS`, `INST`, `MASTER`) | Toggling mute adds `.muted` and disables channel fader; unmuting restores glow; adjusting faders updates dB/-∞ readouts | `0` error toasts; `0` JS/audio errors | N/A (client Web Audio `GainNode` & `Tone.Destination` ramps) | `VOCALS` & `DRUMS` muted (`hasMutedClass: true`, `sliderDisabled: true`) and unmuted cleanly; `BASS` `-24dB` -> `-∞`, `INST` `3dB`, `MASTER` `-6dB` | PASS |
+| 4 | Pitch Shifting / Transpose (`+`, `-`, `RESET`) | Clicking `+` / `-` / `RESET` updates `transpose` indicator (`+1`, `0`, `-1`) and computed key | `0` error toasts; `0` JS/audio errors | N/A (client `Tone.PitchShift.pitch`) | `PITCH: 0 KEY: D` -> `PITCH: +1 KEY: D#` -> `PITCH: 0 KEY: D` -> `PITCH: -1 KEY: C#` -> `PITCH: 0 KEY: D` | PASS |
+| 5 | Seeking (Paused & Playing) + Stop Reset | Seeking while paused updates `currentTime` without starting playback; seeking while playing jumps and advances synchronously; Stop resets to `0:00` | `0` error toasts; `0` JS/audio errors | Streaming MP3 range `[206]` | Paused seek `30` (`0:30`, `stayedPaused: true`); resumed playing to `35.7` (`0:35`), seeked while playing to `60.2` (`1:00`) -> advanced synchronously to `61.7` (`1:01`) after `1500ms` (`"Ⅱ"`); Stop reset to `0` (`0:00`, `"▶"`) | PASS |
+| 6 | Song Switch (`"02"` -> `"01"`) & Console/Audio Error Audit | Reuses persistent `<audio>`/`MediaElementAudioSourceNode`s cleanly on song switch, handles missing `key`, zero `InvalidStateError` or unhandled rejections | `0` JS errors; `0` unhandled rejections; `0` console errors; `67` pre-gesture Web Audio autoplay warnings only | 4x Song `"01"` Cloudinary MP3 stems `[206]` | Song `"01"` ready (`8:51`, `"▶"`, `PITCH: 0 KEY:`), persisted fader readouts (`-∞`, `3dB`, `-6dB`), MediaSession album `"Himay Rehearsal Player"`, played to `0:06` & stopped cleanly | PASS |
+
+**Overall Verdict:** PASS
+**Seeded/Cleaned:** N/A (read-only static song manifest + Cloudinary streaming stems; no backend entities created or mutated).
+**Personal Data:** None present — song IDs/titles and DOM/network status evidence only.
+**Screenshots:** Omitted (default).
+
+### Prioritized Manual Verification Guide
+
+| Priority | Target / Flow | Route / Entry Point | Action | Expected Result |
+|---|---|---|---|---|
+| P1 | Core Streaming Playback & Sync | `http://localhost:5173/` | Select Song `"02"`, wait for `▶` to enable, click `▶`, listen across 15s, seek to `1:00`, click `■` | All 4 stems play in tight sync (`<30ms`), seek jumps cleanly without stutter, Stop resets timer to `0:00` |
+| P1 | Split-Graph Pitch Shifting & Channel Mixing | `http://localhost:5173/` | While playing, click `+` twice (`PITCH: +2`), mute `VOCALS`, lower `BASS` fader, adjust `MASTER` fader | Melodic stems pitch up cleanly while `DRUMS` stays unshifted/punchy; `MASTER` scales all stems including drums |
+| P2 | Song Switch & Missing-Key Edge Case | `http://localhost:5173/` | While playing Song `"02"`, select Song `"01"` (`Langit + Sapat Na At Higit Pa`), wait for `▶`, press Play | Playback halts on switch, `PITCH` resets to `0`, existing channel fader settings persist, Song `"01"` loads and plays without errors |
+| P3 | Mobile / Background Resilience & Offline Cache | `http://localhost:5173/` | Click `↓` to cache stems offline, switch browser tabs during playback, return to tab | Download marks `✓` after caching; returning to tab resumes `AudioContext` cleanly without console errors |
 
 ## Resolution
 
