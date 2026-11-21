@@ -1,7 +1,7 @@
 # TASK-001 — Phase 1: Memory & Data Hygiene
 - **Tier:** 1
 - **Date Created:** 2026-11-20
-- **Status:** In Progress
+- **Status:** Complete
 
 ---
 
@@ -154,3 +154,29 @@ N/A — no API contract required for this task.
   - `src/styles/ChordMonitor.css` L26–41, L112–167 — Cleaned up obsolete scan/setup styles, preserved performance layout (L1–110)
   - `src/utils/chordScanner.ts` (deleted) — Deleted obsolete unused file (AC-13, AM-4)
 - **Notes:** Implementation and Fix Loop Attempt 1 completed strictly within `/home/james2898/projects/himay-phase1` worktree on branch `feature/phase1-cache-chords` (explicitly mandated by user). Fixed `react-refresh/only-export-components` by un-exporting `getTransposedLabel`. Fixed `useMemo` dependency churn by declaring module-scoped `EMPTY_CHORDS`. Optimized `activeChord` lookup to a zero-allocation reverse loop. Added scoped `revoke(url)` method to `StemUrlManager`. Parallelized stem URL fetching with `Promise.all` in `useAudioEngine.ts` and scoped cleanup on cancellation and failure. All ACs satisfied.
+
+---
+
+## Live Verification Report — TASK-001
+
+| # | Case | Expected | Toast / DOM Mutations (recorded) | Network | UI state | Verdict |
+|---|------|----------|----------------------------------|---------|----------|---------|
+| 1 | Initial load & scanner UI removal (`http://localhost:3001`) | Page renders cleanly; `"GENERATE CHORD MAP"` button, scan progress bar, and scanner DOM elements completely absent; fallback `"--"` shown | None emitted; `localStorageCalls: []` | `GET /` `[200]`, `GET /songs.json` `[200]` (10 songs), Vite assets `[200]` | `title="himay"`, `.logo="HIMAY"`, `.song-picker=""` (11 options), `.chord-main-text="--"`, `hasLiveLabel=false`, `hasGenerateBtn=false`, `foundScannerEls=[]`, `hasGenerateChordMapText=false` | PASS |
+| 2 | Song 01 selection & pre-computed chords | Selecting Song `"01"` (`Langit + Sapat Na At Higit Pa`) displays `"LIVE HARMONICS"`, active chord `"G"` at `0:00`, next chord `"D/F#"`, key `"G"`, duration `"8:51"`, zero `localStorage` usage | MutationObserver recorded `.chord-meta-header` (`"LIVE HARMONICS"`) and `.chord-next-preview` (`"D/F#"`); `localStorageCalls: []` | 4 Song 01 Cloudinary MP3 stem `GET`s `[200]` | `selectedValue="01"`, `.live-label="LIVE HARMONICS"`, `.chord-main-text="G"`, `.chord-next-preview="D/F#"`, `.chord-prev-preview=null`, `.util-label="PITCH: 0 KEY: G"`, `.seeker-row .time=["0:00","8:51"]` | PASS |
+| 3 | Transposition & timeline seeking verification | `+1`/`+2`/`RESET`/`-1` transpose root & slash bass notes chromatically (`G -> G#`, `D/F# -> D#/G`); seeking `input.seeker-bar` updates active/prev/next chords immediately | None emitted; `localStorageCalls: []` | N/A (client-side state & Tone.js pitch shift) | At `0s`: `+1` => `"G#"` / next `"D#/G"`, `+2` => `"A"` / next `"E/G#"`, `-1` => `"F#"` / next `"C#/F"`. At `10s`: `0` => prev `"G"`, main `"D/F#"`, next `"Em7"`; `+1` => prev `"G#"`, main `"D#/G"`, next `"Fm7"`. At `25s`: `0` => prev `"Em7"`, main `"Cadd9"`, next `null`. Back to `0s`: main `"G"`, next `"D/F#"` | PASS |
+| 4 | Graceful fallback on missing chords (Song 02) & deselection | Selecting Song `"02"` (no `chords` array) with `transpose=+1` and `0`, plus deselecting to `""`, displays `"--"` gracefully and hides `"LIVE HARMONICS"` & previews | `mutationsRecorded: []`, `localStorageCalls: []` | 4 Song 02 Cloudinary MP3 stem `GET`s `[200]` | Song `"02"` (`+1`): `.util-label="PITCH: +1 KEY: D"`, `.live-label=null`, `.chord-main-text="--"`, previews `null`, duration `"6:07"`. Song `"02"` (`0`): `.chord-main-text="--"`. Deselected (`""`): `.chord-main-text="--"`, times `["0:00","0:00"]` | PASS |
+| 5 | Console audit & sibling controls regression | Zero uncaught JS exceptions, React hydration errors, or broken AudioContext errors; sibling mute toggle works | None emitted | All 43 requests `[200]` (0 failed) | Console total 75 messages: `Errors: 0`, `Warnings: 67` (standard Chrome pre-gesture `AudioContext` suspended warnings from `tone.js`), plus `Audio Engine: vocals/Drums/bass/inst connected...` logs. `VOCALS` mute toggle cycled `"mute-btn active-glow"` → `"mute-btn "` → `"mute-btn active-glow"` | PASS |
+
+**Overall Verdict:** PASS
+**Seeded/Cleaned:** No throwaway API/DB entities seeded (static JSON manifest & client-side app); verified `localStorage` keys `[]` and closed Playwright browser cleanly. No pre-existing data touched.
+**Personal Data:** Stripped — N/A (no personal data in app or output).
+**Screenshots:** Omitted (default).
+
+### Prioritized Manual Verification Guide
+
+| Priority | Target / Flow | Route / Entry Point | Action | Expected Result |
+|---|---|---|---|---|
+| P1 | Song 01 pre-computed chord monitor & timeline sync | `/` (`http://localhost:3001`) | Select `Langit + Sapat Na At Higit Pa (Key of G + F)` from `.song-picker`, drag `.seeker-bar` through `0:00` → `0:10` → `0:17` → `0:25`, and press Play (`▶`) | `"LIVE HARMONICS"` appears; chords transition `G` → `D/F#` → `Em7` → `Cadd9` with dimmed prev/next previews; audio plays cleanly |
+| P1 | Chromatic & slash-chord transposition | `/` (`http://localhost:3001`) | With Song 01 selected, click `+`, `-`, and `RESET` in `.pitch-btns` at `0:00` and `0:10` | Both root and slash bass notes transpose chromatically (`G` → `G#`, `D/F#` → `D#/G` at `+1`; `C#/F` at `-1`) and `RESET` restores `G` / `D/F#` |
+| P2 | Missing chords fallback & scanner removal | `/` (`http://localhost:3001`) | Inspect initial load and then select `Don Mon - God is Good All The Time (D)` (Song 02), including with transpose `+1` active | `"GENERATE CHORD MAP"` button and progress bar never appear; `ChordMonitor` displays `"--"` gracefully with no `"LIVE HARMONICS"` badge or errors |
+| P3 | Sibling mixer controls & song-switch teardown | `/` (`http://localhost:3001`) | Toggle `VOCALS`/`DRUMS`/`BASS`/`INST` mute buttons, adjust `MASTER` fader, switch between songs, and open `DEBUG` console | Sibling mute/fader controls operate normally; switching songs stops playback, resets position cleanly, and produces zero console errors |
