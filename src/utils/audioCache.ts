@@ -1,7 +1,7 @@
 export const CACHE_NAME = "himay-stems-v1";
 
 export class StemUrlManager {
-  private activeUrls: Set<string> = new Set();
+  private activeUrls = new Set<string>();
 
   create(blob: Blob): string {
     const url = URL.createObjectURL(blob);
@@ -16,10 +16,14 @@ export class StemUrlManager {
   }
 
   revokeAll(): void {
-    this.activeUrls.forEach((url) => {
+    for (const url of this.activeUrls) {
       URL.revokeObjectURL(url);
-    });
+    }
     this.activeUrls.clear();
+  }
+
+  get urls(): string[] {
+    return Array.from(this.activeUrls);
   }
 }
 
