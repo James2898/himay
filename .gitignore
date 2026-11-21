@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Artifacts and QA
+.qa/
+.ai-toolbox/
+MEMORY.md

@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as Tone from "tone";
 import type { Song, Stem } from "../types";
-import { getCachedUrl } from "../utils/audioCache";
+import { getCachedUrl, stemUrlManager } from "../utils/audioCache";
 
 // Constant to avoid TypeScript 'urls' property errors and for clean iteration
 const STEM_KEYS: (keyof Stem)[] = ["vocals", "drums", "bass", "inst"];
@@ -27,6 +27,11 @@ export const useAudioEngine = (selectedSong: Song | null) => {
   React.useEffect(() => {
     if (!selectedSong) {
       setIsReady(false);
+      if (players.current) {
+        players.current.dispose();
+        players.current = null;
+      }
+      stemUrlManager.revokeAll();
       return;
     }
 
@@ -34,19 +39,35 @@ export const useAudioEngine = (selectedSong: Song | null) => {
 
     const loadStems = async () => {
       setIsReady(false);
+      let loadedUrls: string[] = [];
 
       try {
-        // Resolve URLs (Cache-first approach)
-        const urls = {
-          vocals: await getCachedUrl(selectedSong.stems.vocals),
-          drums: await getCachedUrl(selectedSong.stems.drums),
-          bass: await getCachedUrl(selectedSong.stems.bass),
-          inst: await getCachedUrl(selectedSong.stems.inst),
-        };
-
         if (players.current) {
           players.current.dispose();
+          players.current = null;
         }
+        stemUrlManager.revokeAll();
+
+        // Resolve URLs in parallel (Cache-first approach)
+        const [vocalsUrl, drumsUrl, bassUrl, instUrl] = await Promise.all([
+          getCachedUrl(selectedSong.stems.vocals),
+          getCachedUrl(selectedSong.stems.drums),
+          getCachedUrl(selectedSong.stems.bass),
+          getCachedUrl(selectedSong.stems.inst),
+        ]);
+        loadedUrls = [vocalsUrl, drumsUrl, bassUrl, instUrl];
+
+        if (!isMounted) {
+          loadedUrls.forEach((u) => stemUrlManager.revoke(u));
+          return;
+        }
+
+        const urls = {
+          vocals: vocalsUrl,
+          drums: drumsUrl,
+          bass: bassUrl,
+          inst: instUrl,
+        };
 
         /**
          * We load the players and connect them to the PitchShift node
@@ -81,6 +102,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
         players.current = p;
       } catch (err) {
         console.error("Audio Engine Load Error:", err);
+        loadedUrls.forEach((u) => stemUrlManager.revoke(u));
       }
     };
 
@@ -88,6 +110,11 @@ export const useAudioEngine = (selectedSong: Song | null) => {
 
     return () => {
       isMounted = false;
+      if (players.current) {
+        players.current.dispose();
+        players.current = null;
+      }
+      stemUrlManager.revokeAll();
     };
   }, [selectedSong]);
 
