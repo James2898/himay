@@ -2,7 +2,7 @@ import * as React from "react";
 import ChannelStrip from "./ChannelStrip";
 import { useAudioEngine } from "../hooks/useAudioEngine";
 import type { Song, Stem } from "../types";
-import { cacheSongStems, getCachedUrl } from "../utils/audioCache";
+import { cacheSongStems } from "../utils/audioCache";
 import ChordMonitor from "./ChordMonitor";
 
 const TRACK_COLORS: Record<keyof Stem, string> = {
@@ -88,97 +88,6 @@ const Mixer: React.FC = () => {
     }
   }, [selectedSong]);
 
-  const handleChordScan = React.useCallback(
-    async (updateProgress: (p: number) => void) => {
-      if (!selectedSong) return null;
-
-      try {
-        const instUrl = await getCachedUrl(selectedSong.stems.bass);
-        const response = await fetch(instUrl);
-        const arrayBuffer = await response.arrayBuffer();
-        const audioCtx =
-          new // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (window.AudioContext || (window as any).webkitAudioContext)();
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        audioCtx.close();
-
-        const duration = audioBuffer.duration;
-        const sampleRate = audioBuffer.sampleRate;
-        const stepSize = 0.25; // High resolution scanning (250ms)
-        const chordMap: { time: number; label: string }[] = [];
-
-        // PERSISTENCE LOGIC
-        let currentVote = "";
-        let voteCounter = 0;
-        const REQUIRED_VOTES = 2; // Reduced to 0.5s to capture faster tempo changes
-
-        for (let t = 0; t < duration; t += stepSize) {
-          const startSample = Math.floor(t * sampleRate);
-          const chunk = audioBuffer
-            .getChannelData(0)
-            .slice(startSample, startSample + 4096);
-
-          let maxAmp = 0;
-          let maxIdx = 0;
-          for (let i = 0; i < chunk.length; i++) {
-            const amp = Math.abs(chunk[i]);
-            if (amp > maxAmp) {
-              maxAmp = amp;
-              maxIdx = i;
-            }
-          }
-
-          const freq = maxIdx * (sampleRate / chunk.length);
-          const midi = Math.round(12 * Math.log2(freq / 440) + 69);
-
-          // Lower threshold (0.01) to detect quieter notes
-          const detectedLabel = maxAmp > 0.01 ? NOTES[midi % 12] : "--";
-
-          // VOTING SYSTEM
-          if (detectedLabel === currentVote) {
-            voteCounter++;
-          } else {
-            currentVote = detectedLabel;
-            voteCounter = 1;
-          }
-
-          // Commit logic: Capture the change once stability is reached
-          if (voteCounter === REQUIRED_VOTES) {
-            if (
-              chordMap.length === 0 ||
-              chordMap[chordMap.length - 1].label !== currentVote
-            ) {
-              // Register chord at the timestamp where the note started being stable
-              const startTime = t - stepSize * (REQUIRED_VOTES - 1);
-              chordMap.push({
-                time: Math.max(0, startTime),
-                label: currentVote,
-              });
-            }
-          }
-
-          updateProgress(Math.round((t / duration) * 100));
-
-          // Yield for UI thread responsiveness
-          if (Math.floor(t / stepSize) % 40 === 0) {
-            await new Promise((r) => setTimeout(r, 0));
-          }
-        }
-
-        // Fallback: If map is empty (e.g. very dynamic song), return at least the first detected note
-        if (chordMap.length === 0 && currentVote !== "") {
-          chordMap.push({ time: 0, label: currentVote });
-        }
-
-        return chordMap;
-      } catch (err) {
-        console.error("Scanner Bridge Error:", err);
-        throw err;
-      }
-    },
-    [selectedSong],
-  );
-
   const handleSongChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const songId = e.target.value;
     const song = songs.find((s) => s.id === songId) || null;
@@ -234,8 +143,7 @@ const Mixer: React.FC = () => {
 
   const handleToggleMute = (trackId: keyof Stem) => {
     const newState = !mutedTracks[trackId];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    setMutedTracks((prev: any) => ({ ...prev, [trackId]: newState }));
+    setMutedTracks((prev) => ({ ...prev, [trackId]: newState }));
     toggleMute(trackId, newState);
   };
 
@@ -312,11 +220,9 @@ const Mixer: React.FC = () => {
       </div>
 
       <ChordMonitor
-        songId={selectedSong?.id}
+        selectedSong={selectedSong}
         currentTime={currentTime}
         transpose={transpose}
-        isReady={isReady}
-        onStartScan={handleChordScan}
       />
 
       <div className="console-bed">
