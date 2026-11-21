@@ -1,4 +1,4 @@
-const CACHE_NAME = "himay-stems-v1";
+export const CACHE_NAME = "himay-stems-v1";
 
 export class StemUrlManager {
   private activeUrls: Set<string> = new Set();
@@ -26,17 +26,25 @@ export class StemUrlManager {
 export const stemUrlManager = new StemUrlManager();
 
 export const cacheSongStems = async (stems: Record<string, string>) => {
+  if (typeof window === "undefined" || !window.caches) {
+    throw new Error(
+      "Offline caching requires HTTPS or localhost (CacheStorage is disabled over insecure HTTP).",
+    );
+  }
+
   const cache = await caches.open(CACHE_NAME);
   const urls = Object.values(stems);
 
-  // Only download if not already in cache
-  for (const url of urls) {
-    const response = await cache.match(url);
-    if (!response) {
-      console.log(`Caching: ${url}`);
-      await cache.add(url);
-    }
-  }
+  // Download uncached stems in parallel
+  await Promise.all(
+    urls.map(async (url) => {
+      const response = await cache.match(url);
+      if (!response) {
+        console.log(`Caching: ${url}`);
+        await cache.add(url);
+      }
+    }),
+  );
 };
 
 export const getCachedUrl = async (url: string): Promise<string> => {

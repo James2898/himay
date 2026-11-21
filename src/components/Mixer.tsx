@@ -2,7 +2,7 @@ import * as React from "react";
 import ChannelStrip from "./ChannelStrip";
 import { useAudioEngine } from "../hooks/useAudioEngine";
 import type { Song, Stem } from "../types";
-import { cacheSongStems } from "../utils/audioCache";
+import { cacheSongStems, CACHE_NAME } from "../utils/audioCache";
 import ChordMonitor from "./ChordMonitor";
 
 const TRACK_COLORS: Record<keyof Stem, string> = {
@@ -19,7 +19,9 @@ const Mixer: React.FC = () => {
   const [selectedSong, setSelectedSong] = React.useState<Song | null>(null);
   const [songKey, setSelectedSongKey] = React.useState<string>("");
   const [isCached, setIsCached] = React.useState<boolean>(false);
+  const [isDownloading, setIsDownloading] = React.useState<boolean>(false);
   const [masterVolume, setMasterVolume] = React.useState<number>(0);
+  const isOfflineSupported = typeof window !== "undefined" && !!window.caches;
   const [mutedTracks, setMutedTracks] = React.useState<
     Record<keyof Stem, boolean>
   >({
@@ -68,7 +70,7 @@ const Mixer: React.FC = () => {
       if (!stems) {
         return;
       }
-      const cache = await caches.open("himay-stems-v1");
+      const cache = await caches.open(CACHE_NAME);
       const urls = Object.values(stems);
       const matches = await Promise.all(urls.map((url) => cache.match(url)));
       setIsCached(matches.every((match) => match !== undefined));
@@ -128,15 +130,25 @@ const Mixer: React.FC = () => {
   };
 
   const handleDownload = async () => {
-    if (selectedSong && !isCached) {
+    if (selectedSong && !isCached && !isDownloading) {
+      if (!isOfflineSupported) {
+        alert(
+          "Offline saving requires HTTPS or localhost (CacheStorage is disabled over insecure HTTP).",
+        );
+        return;
+      }
+      setIsDownloading(true);
       try {
         const stems = selectedSong.stems as unknown as Record<string, string>;
-        alert(`${selectedSong.title} is now available offline!`);
         await cacheSongStems(stems);
         setIsCached(true);
       } catch (error) {
-        alert("Download failed");
-        console.log(error);
+        const message =
+          error instanceof Error ? error.message : "Download failed";
+        alert(`Download failed: ${message}`);
+        console.error("Cache stems error:", error);
+      } finally {
+        setIsDownloading(false);
       }
     }
   };
@@ -181,10 +193,24 @@ const Mixer: React.FC = () => {
         <button
           className={`transport-btn download ${isCached ? "cached" : ""}`}
           onClick={handleDownload}
-          title={isCached ? "Saved Offline" : "Save Offline"}
-          disabled={!selectedSong || !isReady || isCached}
+          title={
+            !isOfflineSupported
+              ? "Offline saving requires HTTPS or localhost"
+              : isCached
+                ? "Saved Offline"
+                : isDownloading
+                  ? "Downloading Stems..."
+                  : "Save Offline"
+          }
+          disabled={
+            !selectedSong ||
+            !isReady ||
+            isCached ||
+            isDownloading ||
+            !isOfflineSupported
+          }
         >
-          {isCached ? "✓" : "↓"}
+          {isCached ? "✓" : isDownloading ? "⏳" : "↓"}
         </button>
         <button
           className="transport-btn stop"
