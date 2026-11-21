@@ -23,22 +23,6 @@
   text-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
 }
 
-.reset-button {
-  background: #444;
-  border: none;
-  color: white;
-  font-size: 10px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background 0.2s;
-}
-
-.reset-button:hover {
-  background: #666;
-}
-
 /* The black main display box */
 .chord-box-main {
   width: 100%;
@@ -107,61 +91,4 @@
   filter: blur(0.5px);
   pointer-events: none;
   transition: opacity 0.4s ease;
-}
-
-/* Scanning / Setup States */
-.setup-view {
-  width: 80%;
-  text-align: center;
-}
-
-.gen-btn {
-  width: 100%;
-  background: transparent;
-  border: 1px dashed rgba(255, 255, 255, 0.3);
-  color: white;
-  padding: 18px;
-  border-radius: 12px;
-  font-weight: bold;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.gen-btn:hover:not(.disabled) {
-  background: rgba(255, 255, 255, 0.05);
-  border-style: solid;
-}
-
-.gen-btn.disabled {
-  opacity: 0.15;
-  cursor: not-allowed;
-}
-
-.scanner-container {
-  width: 100%;
-}
-
-.scanner-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  color: white;
-  font-weight: bold;
-  margin-bottom: 10px;
-  letter-spacing: 1px;
-}
-
-.progress-track {
-  height: 5px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progress-fill {
-  height: 100%;
-  background: #00ff88;
-  box-shadow: 0 0 10px #00ff88;
-  transition: width 0.3s ease;
 }

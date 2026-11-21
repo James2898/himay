@@ -94,6 +94,8 @@ export const useAudioEngine = (selectedSong: Song | null) => {
     return () => {
       // Cleanup for unmount / StrictMode remount (AM-2)
       isPlayingRef.current = false;
+      // Invalidate any in-flight play requests on unmount
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       playRequestIdRef.current++;
 
       if (syncIntervalRef.current !== null) {
