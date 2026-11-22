@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] — 2026-11-22
+
+### Added
+- Added `/favicon.svg` SVG icon asset for Web `MediaSession` artwork resolution without 404 errors (`TASK-20261122-hy7`)
+  - Affected files: `public/favicon.svg`
+- Added non-blocking `.resume-status-toast` banner UI (`role="status"`, `aria-live="polite"`) in `src/components/Mixer.tsx` and studio-themed toast styling in `src/styles/Mixer.css` to surface `"Audio paused by device — tap Play to resume"` when mobile autoplay policy blocks background resumption (`TASK-20261122-hy7`)
+  - Affected files: `src/components/Mixer.tsx`, `src/styles/Mixer.css`
+
+### Changed
+- Completed Phase 3 mobile OS & WebView resilience in `src/hooks/useAudioEngine.ts`: capability-guarded `MediaSession` metadata (`"Himay Stems"` album fallback, module-hoisted artwork), null/unmount cleanup, frame-rate churn isolation via `togglePlayRef`/`seekToRef`, idempotent hardware action handlers (`play`, `pause`, `seekto`, `seekbackward`, `seekforward`) with per-action `try/catch`, `playbackState` sync (`"none" | "playing" | "paused"`), shared `resolveMasterKey` helper, and `document.visibilitychange` auto-resume for both `suspended`/`interrupted` `AudioContext` and OS-paused stem `<audio>` elements with 450ms bounded timeouts, `visibilityAttemptIdRef` serialization + async stale-state guards, Q1.6 fallback pause/toast state (`resumeNotice`), and 5s auto-dismiss timer cleanup (`TASK-20261122-hy7`)
+  - Affected files: `src/hooks/useAudioEngine.ts`
+
 ## [Unreleased]
 
 ### Added

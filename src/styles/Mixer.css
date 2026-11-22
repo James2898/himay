@@ -38,3 +38,19 @@
   font-size: 0.85rem;
   max-width: 180px;
 }
+
+.resume-status-toast {
+  background: rgba(26, 26, 27, 0.96);
+  color: var(--tape-yellow);
+  border: 1px solid var(--neon-accent);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: -10px 0 16px 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 0 12px rgba(88, 204, 237, 0.25);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
