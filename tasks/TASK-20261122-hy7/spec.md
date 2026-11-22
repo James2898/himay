@@ -33,14 +33,14 @@ Implement Phase 3 (Mobile OS & WebView Resilience) of the Himay Audio Engine Opt
 15. **Touch Unlock & Toast Lifecycle:** Tapping Play in `src/components/Mixer.tsx` executes `Tone.start()` and resumes all stem audio elements cleanly from the paused position. The `"Audio paused by device — tap Play to resume"` toast/indicator dismisses immediately when playback resumes or `selectedSong` changes, and auto-dismisses after a brief timeout (e.g., 5 seconds) with proper timer cleanup on unmount/re-trigger.
 16. **Interface Backward Compatibility (Q1.1):** Refactor `src/hooks/useAudioEngine.ts` in place, preserving its existing return interface and behavior for `src/components/Mixer.tsx`; any new state exposed for the resume toast/status MUST be additive and backward-compatible (exact field/UI integration pending reconciliation with `context.md`).
 17. **UI Toast Indicator & Fast Refresh Hygiene (`MEMORY.md` BUG-001):** Render `"Audio paused by device — tap Play to resume"` cleanly and non-intrusively in `src/components/Mixer.tsx` (using `role="status"` / `aria-live="polite"`, respecting existing UI patterns in `context.md`), without exporting non-component helpers/constants from `.tsx` files.
-18. **Build & Lint Quality Gate:** Running `npm --prefix /home/james2898/projects/himay-phase3 run build` and `npm --prefix /home/james2898/projects/himay-phase3 run lint` completes with exit code 0, 0 TypeScript errors, and 0 ESLint warnings.
+18. **Build & Lint Quality Gate:** Running `npm --prefix . run build` and `npm --prefix . run lint` completes with exit code 0, 0 TypeScript errors, and 0 ESLint warnings.
 
 ## Out of Scope
 - Periodic `navigator.mediaSession.setPositionState` updates on animation frames (not requested in Phase 3 PBI/spec).
 - Service Worker background audio caching or modifications to `CacheStorage` / offline stem caching logic (covered by Phase 1/2).
 - Changes to `ChordMonitor`, transposition logic, stem volume/mute/solo controls, or song catalog schemas.
 - Extracting `useAudioEngine.ts` into a separate engine class or breaking its existing return interface (Q1.1).
-- Any edits, builds, or operations inside `/home/james2898/projects/himay` (strictly confined to `/home/james2898/projects/himay-phase3/`).
+- Any edits, builds, or operations inside `primary-workspace` (strictly confined to ``).
 
 ## Fallback Behaviors
 - **Missing `navigator.mediaSession` or `MediaMetadata` API:** Guard with `"mediaSession" in navigator && typeof MediaMetadata !== "undefined"`; skip OS metadata/handler wiring silently while preserving full in-app audio playback.
