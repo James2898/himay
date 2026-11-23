@@ -36,6 +36,7 @@ const Mixer: React.FC = () => {
     isPlaying,
     currentTime,
     transpose,
+    resumeNotice,
     togglePlay,
     stopPlay,
     seekTo,
@@ -228,6 +229,16 @@ const Mixer: React.FC = () => {
           {!selectedSong ? "▶" : isReady ? (isPlaying ? "Ⅱ" : "▶") : "..."}
         </button>
       </div>
+
+      {resumeNotice && (
+        <div
+          className="resume-status-toast"
+          role="status"
+          aria-live="polite"
+        >
+          {resumeNotice}
+        </div>
+      )}
 
       <div className="seeker-row">
         <span className="time">{formatTime(currentTime)}</span>

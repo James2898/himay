@@ -8,6 +8,67 @@ const DEFAULT_STEM_DB = -10;
 const MIN_AUDIBLE_DB = -60;
 const SYNC_INTERVAL_MS = 100;
 const DRIFT_LIMIT_SECONDS = 0.03; // 30ms
+const RESUME_TIMEOUT_MS = 450;
+const RESUME_TOAST_MESSAGE = "Audio paused by device — tap Play to resume";
+const RESUME_TOAST_DURATION_MS = 5000;
+const DEFAULT_SEEK_OFFSET_SECONDS = 5;
+
+const MEDIA_SESSION_ARTWORK: MediaImage[] = [
+  { src: "/favicon.svg", sizes: "512x512", type: "image/svg+xml" },
+];
+const MEDIA_SESSION_ACTIONS: MediaSessionAction[] = [
+  "play",
+  "pause",
+  "seekto",
+  "seekbackward",
+  "seekforward",
+];
+
+const hasMediaSessionSupport = (): boolean =>
+  typeof navigator !== "undefined" &&
+  "mediaSession" in navigator &&
+  typeof MediaMetadata !== "undefined";
+
+const safeSetMediaActionHandler = (
+  action: MediaSessionAction,
+  handler: MediaSessionActionHandler | null,
+): void => {
+  if (!hasMediaSessionSupport()) {
+    return;
+  }
+  try {
+    navigator.mediaSession.setActionHandler(action, handler);
+  } catch {
+    // Older WebViews may not support optional actions like seekbackward/seekforward
+  }
+};
+
+const clearAllMediaSessionHandlers = (): void => {
+  if (!hasMediaSessionSupport()) {
+    return;
+  }
+  MEDIA_SESSION_ACTIONS.forEach((action) => {
+    safeSetMediaActionHandler(action, null);
+  });
+};
+
+const resolveMasterKey = (
+  elements: Record<keyof Stem, HTMLAudioElement>,
+): keyof Stem => {
+  const drumsEl = elements.drums;
+  const instEl = elements.inst;
+  const isDrumsDelayedOrMissing =
+    !drumsEl ||
+    !drumsEl.src ||
+    drumsEl.error !== null ||
+    drumsEl.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ||
+    (drumsEl.paused &&
+      instEl &&
+      !instEl.paused &&
+      instEl.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA);
+
+  return isDrumsDelayedOrMissing ? "inst" : "drums";
+};
 
 const dbToLinear = (db: number): number => {
   if (db <= MIN_AUDIBLE_DB) {
@@ -39,16 +100,46 @@ export const useAudioEngine = (selectedSong: Song | null) => {
   const isPlayingRef = React.useRef<boolean>(false);
   const playRequestIdRef = React.useRef<number>(0);
   const loadIdRef = React.useRef<number>(0);
+  const visibilityAttemptIdRef = React.useRef<number>(0);
   const syncIntervalRef = React.useRef<number | null>(null);
   const songDurationRef = React.useRef<number>(0);
+  const currentTimeRef = React.useRef<number>(0);
+  const isMountedRef = React.useRef<boolean>(true);
+  const resumeToastTimerRef = React.useRef<number | null>(null);
+  const togglePlayRef = React.useRef<() => Promise<void>>(async () => {});
+  const seekToRef = React.useRef<(time: number) => void>(() => {});
 
   const [isReady, setIsReady] = React.useState(false);
   const [isPlaying, setIsPlaying] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(0);
   const [transpose, setTranspose] = React.useState(0);
+  const [resumeNotice, setResumeNotice] = React.useState<string | null>(null);
+
+  const clearResumeNotice = React.useCallback(() => {
+    if (resumeToastTimerRef.current !== null) {
+      window.clearTimeout(resumeToastTimerRef.current);
+      resumeToastTimerRef.current = null;
+    }
+    setResumeNotice(null);
+  }, []);
+
+  const showResumeNotice = React.useCallback(() => {
+    if (resumeToastTimerRef.current !== null) {
+      window.clearTimeout(resumeToastTimerRef.current);
+      resumeToastTimerRef.current = null;
+    }
+    setResumeNotice(RESUME_TOAST_MESSAGE);
+    resumeToastTimerRef.current = window.setTimeout(() => {
+      resumeToastTimerRef.current = null;
+      if (isMountedRef.current) {
+        setResumeNotice(null);
+      }
+    }, RESUME_TOAST_DURATION_MS);
+  }, []);
 
   // 1. Initialize Persistent Web Audio Nodes & HTMLAudioElements on mount
   React.useEffect(() => {
+    isMountedRef.current = true;
     const rawCtx = Tone.getContext().rawContext as unknown as AudioContext;
     const ps = new Tone.PitchShift(0);
     ps.toDestination();
@@ -93,10 +184,16 @@ export const useAudioEngine = (selectedSong: Song | null) => {
 
     return () => {
       // Cleanup for unmount / StrictMode remount (AM-2)
+      isMountedRef.current = false;
       isPlayingRef.current = false;
       // Invalidate any in-flight play requests on unmount
       // eslint-disable-next-line react-hooks/exhaustive-deps
       playRequestIdRef.current++;
+
+      if (resumeToastTimerRef.current !== null) {
+        window.clearTimeout(resumeToastTimerRef.current);
+        resumeToastTimerRef.current = null;
+      }
 
       if (syncIntervalRef.current !== null) {
         clearInterval(syncIntervalRef.current);
@@ -143,6 +240,8 @@ export const useAudioEngine = (selectedSong: Song | null) => {
     playRequestIdRef.current++;
 
     isPlayingRef.current = false;
+    currentTimeRef.current = 0;
+    clearResumeNotice();
     setIsPlaying(false);
     setIsReady(false);
     setCurrentTime(0);
@@ -277,7 +376,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
       isCancelled = true;
       loadListenersCleanup.forEach((fn) => fn());
     };
-  }, [selectedSong]);
+  }, [selectedSong, clearResumeNotice]);
 
   // 3. Master-Slave 100ms Synchronization Loop (AC-10, AC-11)
   React.useEffect(() => {
@@ -293,18 +392,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
       const elements = audioElementsRef.current;
       if (!elements) return;
 
-      const drumsEl = elements.drums;
-      const instEl = elements.inst;
-
-      // Elect master clock: drums is primary; fallback to inst if drums is delayed or missing
-      const isDrumsDelayedOrMissing =
-        !drumsEl ||
-        !drumsEl.src ||
-        drumsEl.error !== null ||
-        drumsEl.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ||
-        (drumsEl.paused && instEl && !instEl.paused && instEl.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA);
-
-      const masterKey: keyof Stem = isDrumsDelayedOrMissing ? "inst" : "drums";
+      const masterKey = resolveMasterKey(elements);
       const masterEl = elements[masterKey];
 
       if (!masterEl || !masterEl.src || masterEl.error) {
@@ -321,6 +409,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
 
       const masterTime = masterEl.currentTime;
       if (Number.isFinite(masterTime)) {
+        currentTimeRef.current = masterTime;
         setCurrentTime(masterTime);
 
         // Snap slave stems if drift > 30ms (0.03s)
@@ -345,16 +434,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
       const elements = audioElementsRef.current;
       if (!elements) return;
 
-      const drumsEl = elements.drums;
-      const instEl = elements.inst;
-      const isDrumsDelayedOrMissing =
-        !drumsEl ||
-        !drumsEl.src ||
-        drumsEl.error !== null ||
-        drumsEl.readyState < HTMLMediaElement.HAVE_FUTURE_DATA ||
-        (drumsEl.paused && instEl && !instEl.paused && instEl.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA);
-
-      const masterKey: keyof Stem = isDrumsDelayedOrMissing ? "inst" : "drums";
+      const masterKey = resolveMasterKey(elements);
 
       const allEnded = STEM_KEYS.every((k) => {
         const el = elements[k];
@@ -415,6 +495,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
       return;
     }
 
+    clearResumeNotice();
     isPlayingRef.current = true;
     const requestId = ++playRequestIdRef.current;
 
@@ -465,11 +546,12 @@ export const useAudioEngine = (selectedSong: Song | null) => {
       }
       setIsPlaying(false);
     }
-  }, [isReady]);
+  }, [isReady, clearResumeNotice]);
 
   const stopPlay = React.useCallback(() => {
     isPlayingRef.current = false;
     playRequestIdRef.current++;
+    clearResumeNotice();
 
     if (syncIntervalRef.current !== null) {
       clearInterval(syncIntervalRef.current);
@@ -486,9 +568,10 @@ export const useAudioEngine = (selectedSong: Song | null) => {
       });
     }
 
+    currentTimeRef.current = 0;
     setCurrentTime(0);
     setIsPlaying(false);
-  }, []);
+  }, [clearResumeNotice]);
 
   const seekTo = React.useCallback(
     (time: number) => {
@@ -524,6 +607,7 @@ export const useAudioEngine = (selectedSong: Song | null) => {
         }
       });
 
+      currentTimeRef.current = clampedTime;
       setCurrentTime(clampedTime);
     },
     [isReady],
@@ -587,66 +671,307 @@ export const useAudioEngine = (selectedSong: Song | null) => {
   );
 
   // 6. Mobile Resilience: MediaSession API & Background Auto-Resume
+  const getCurrentMasterTime = React.useCallback((): number => {
+    const elements = audioElementsRef.current;
+    if (!elements) {
+      return currentTimeRef.current;
+    }
+    const masterKey = resolveMasterKey(elements);
+    const masterEl = elements[masterKey];
+    const masterTime = masterEl?.currentTime;
+    return typeof masterTime === "number" && Number.isFinite(masterTime)
+      ? masterTime
+      : currentTimeRef.current;
+  }, []);
+
   React.useEffect(() => {
-    if (
-      typeof navigator === "undefined" ||
-      !("mediaSession" in navigator) ||
-      !selectedSong
-    ) {
+    togglePlayRef.current = togglePlay;
+    seekToRef.current = seekTo;
+  }, [togglePlay, seekTo]);
+
+  React.useEffect(() => {
+    if (!hasMediaSessionSupport()) {
+      return;
+    }
+
+    if (!selectedSong) {
+      navigator.mediaSession.metadata = null;
+      navigator.mediaSession.playbackState = "none";
+      clearAllMediaSessionHandlers();
       return;
     }
 
     navigator.mediaSession.metadata = new MediaMetadata({
       title: selectedSong.title,
       artist: "Himay Rehearsal Player",
-      album: selectedSong.key ? `Key of ${selectedSong.key}` : "Himay Rehearsal Player",
-      artwork: [
-        { src: "/favicon.svg", sizes: "512x512", type: "image/svg+xml" },
-      ],
+      album: selectedSong.key ? `Key of ${selectedSong.key}` : "Himay Stems",
+      artwork: MEDIA_SESSION_ARTWORK,
     });
+    navigator.mediaSession.playbackState = isPlayingRef.current
+      ? "playing"
+      : "paused";
 
-    navigator.mediaSession.setActionHandler("play", () => {
+    safeSetMediaActionHandler("play", () => {
       if (!isPlayingRef.current) {
-        togglePlay();
+        void togglePlayRef.current();
       }
     });
-    navigator.mediaSession.setActionHandler("pause", () => {
+    safeSetMediaActionHandler("pause", () => {
       if (isPlayingRef.current) {
-        togglePlay();
+        void togglePlayRef.current();
       }
     });
-    navigator.mediaSession.setActionHandler("seekto", (details) => {
-      if (details.seekTime !== undefined) {
-        seekTo(details.seekTime);
+    safeSetMediaActionHandler("seekto", (details) => {
+      if (
+        details.seekTime !== undefined &&
+        Number.isFinite(details.seekTime)
+      ) {
+        seekToRef.current(details.seekTime);
       }
+    });
+    safeSetMediaActionHandler("seekbackward", (details) => {
+      const offset =
+        details.seekOffset !== undefined &&
+        Number.isFinite(details.seekOffset) &&
+        details.seekOffset > 0
+          ? details.seekOffset
+          : DEFAULT_SEEK_OFFSET_SECONDS;
+      const baseTime = getCurrentMasterTime();
+      seekToRef.current(Math.max(0, baseTime - offset));
+    });
+    safeSetMediaActionHandler("seekforward", (details) => {
+      const offset =
+        details.seekOffset !== undefined &&
+        Number.isFinite(details.seekOffset) &&
+        details.seekOffset > 0
+          ? details.seekOffset
+          : DEFAULT_SEEK_OFFSET_SECONDS;
+      const baseTime = getCurrentMasterTime();
+      const duration = songDurationRef.current;
+      const targetTime =
+        Number.isFinite(duration) && duration > 0
+          ? Math.min(duration, Math.max(0, baseTime + offset))
+          : Math.max(0, baseTime + offset);
+      seekToRef.current(targetTime);
     });
 
     return () => {
-      if ("mediaSession" in navigator) {
-        navigator.mediaSession.setActionHandler("play", null);
-        navigator.mediaSession.setActionHandler("pause", null);
-        navigator.mediaSession.setActionHandler("seekto", null);
+      if (hasMediaSessionSupport()) {
+        navigator.mediaSession.metadata = null;
+        navigator.mediaSession.playbackState = "none";
+        clearAllMediaSessionHandlers();
       }
     };
-  }, [selectedSong, togglePlay, seekTo]);
+  }, [selectedSong, getCurrentMasterTime]);
 
   React.useEffect(() => {
+    if (!hasMediaSessionSupport()) {
+      return;
+    }
+
+    if (!selectedSong) {
+      navigator.mediaSession.playbackState = "none";
+      return;
+    }
+
+    navigator.mediaSession.playbackState = isPlaying ? "playing" : "paused";
+  }, [selectedSong, isPlaying]);
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const triggerAutoplayBlockedFallback = (
+      expectedLoadId: number,
+      expectedPlayRequestId: number,
+      expectedAttemptId: number,
+    ) => {
+      if (
+        !isMountedRef.current ||
+        expectedLoadId !== loadIdRef.current ||
+        expectedPlayRequestId !== playRequestIdRef.current ||
+        expectedAttemptId !== visibilityAttemptIdRef.current ||
+        !isPlayingRef.current
+      ) {
+        return;
+      }
+
+      isPlayingRef.current = false;
+      playRequestIdRef.current++;
+
+      const elements = audioElementsRef.current;
+      if (elements) {
+        STEM_KEYS.forEach((k) => elements[k]?.pause());
+      }
+
+      setIsPlaying(false);
+      if (hasMediaSessionSupport()) {
+        navigator.mediaSession.playbackState = "paused";
+      }
+      showResumeNotice();
+    };
+
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === "visible" && isPlayingRef.current) {
-        const rawCtx = Tone.getContext().rawContext;
-        if (rawCtx.state === "suspended") {
-          try {
-            await Tone.start();
-          } catch (err) {
-            console.warn("Autoplay policy blocked background resume:", err);
-            isPlayingRef.current = false;
-            const elements = audioElementsRef.current;
-            if (elements) {
-              STEM_KEYS.forEach((k) => elements[k]?.pause());
-            }
-            setIsPlaying(false);
+      if (document.visibilityState !== "visible" || !isPlayingRef.current) {
+        return;
+      }
+
+      const activeLoadId = loadIdRef.current;
+      const activePlayRequestId = playRequestIdRef.current;
+      const activeAttemptId = ++visibilityAttemptIdRef.current;
+
+      const rawCtx = Tone.getContext()?.rawContext as
+        | (AudioContext & { resume?: () => Promise<void> })
+        | undefined;
+
+      const rawState = rawCtx ? (rawCtx.state as string) : "";
+      const needsContextResume =
+        Boolean(rawCtx) &&
+        (rawState === "suspended" || rawState === "interrupted");
+
+      if (needsContextResume && rawCtx && typeof rawCtx.resume === "function") {
+        let timeoutId: number | null = null;
+        try {
+          const resumeResult = await Promise.race<"resumed" | "timeout">([
+            rawCtx.resume().then(() => "resumed" as const),
+            new Promise<"timeout">((resolve) => {
+              timeoutId = window.setTimeout(
+                () => resolve("timeout"),
+                RESUME_TIMEOUT_MS,
+              );
+            }),
+          ]);
+
+          if (timeoutId !== null) {
+            window.clearTimeout(timeoutId);
+            timeoutId = null;
           }
+
+          if (
+            !isMountedRef.current ||
+            activeLoadId !== loadIdRef.current ||
+            activePlayRequestId !== playRequestIdRef.current ||
+            activeAttemptId !== visibilityAttemptIdRef.current ||
+            !isPlayingRef.current
+          ) {
+            return;
+          }
+
+          if (
+            resumeResult === "timeout" ||
+            (rawCtx.state as string) !== "running"
+          ) {
+            triggerAutoplayBlockedFallback(
+              activeLoadId,
+              activePlayRequestId,
+              activeAttemptId,
+            );
+            return;
+          }
+        } catch (err) {
+          if (timeoutId !== null) {
+            window.clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          console.warn("Autoplay policy blocked background resume:", err);
+          triggerAutoplayBlockedFallback(
+            activeLoadId,
+            activePlayRequestId,
+            activeAttemptId,
+          );
+          return;
         }
+      }
+
+      if (
+        !isMountedRef.current ||
+        activeLoadId !== loadIdRef.current ||
+        activePlayRequestId !== playRequestIdRef.current ||
+        activeAttemptId !== visibilityAttemptIdRef.current ||
+        !isPlayingRef.current
+      ) {
+        return;
+      }
+
+      // AM-2: Inspect active stem <audio> elements in case mobile OS paused them while rawCtx stayed "running"
+      const elements = audioElementsRef.current;
+      if (!elements) {
+        return;
+      }
+
+      const pausedStems = STEM_KEYS.filter((k) => {
+        const el = elements[k];
+        return Boolean(el && el.src && !el.ended && el.paused);
+      });
+
+      if (pausedStems.length === 0) {
+        return;
+      }
+
+      const targetTime = getCurrentMasterTime();
+      STEM_KEYS.forEach((k) => {
+        const el = elements[k];
+        if (!el || !el.src || el.ended || el.seeking) {
+          return;
+        }
+        if (Math.abs(el.currentTime - targetTime) > DRIFT_LIMIT_SECONDS) {
+          el.currentTime = targetTime;
+        }
+      });
+
+      let stemTimeoutId: number | null = null;
+      try {
+        const stemResumeResult = await Promise.race<"resumed" | "timeout">([
+          Promise.all(pausedStems.map((k) => elements[k].play())).then(
+            () => "resumed" as const,
+          ),
+          new Promise<"timeout">((resolve) => {
+            stemTimeoutId = window.setTimeout(
+              () => resolve("timeout"),
+              RESUME_TIMEOUT_MS,
+            );
+          }),
+        ]);
+
+        if (stemTimeoutId !== null) {
+          window.clearTimeout(stemTimeoutId);
+          stemTimeoutId = null;
+        }
+
+        if (
+          !isMountedRef.current ||
+          activeLoadId !== loadIdRef.current ||
+          activePlayRequestId !== playRequestIdRef.current ||
+          activeAttemptId !== visibilityAttemptIdRef.current ||
+          !isPlayingRef.current
+        ) {
+          return;
+        }
+
+        const stillPaused = pausedStems.some((k) => {
+          const el = elements[k];
+          return Boolean(el && el.src && !el.ended && el.paused);
+        });
+
+        if (stemResumeResult === "timeout" || stillPaused) {
+          triggerAutoplayBlockedFallback(
+            activeLoadId,
+            activePlayRequestId,
+            activeAttemptId,
+          );
+        }
+      } catch (err) {
+        if (stemTimeoutId !== null) {
+          window.clearTimeout(stemTimeoutId);
+          stemTimeoutId = null;
+        }
+        console.warn("Autoplay policy blocked stem audio resume:", err);
+        triggerAutoplayBlockedFallback(
+          activeLoadId,
+          activePlayRequestId,
+          activeAttemptId,
+        );
       }
     };
 
@@ -654,13 +979,14 @@ export const useAudioEngine = (selectedSong: Song | null) => {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [getCurrentMasterTime, showResumeNotice]);
 
   return {
     isReady,
     isPlaying,
     currentTime,
     transpose,
+    resumeNotice,
     togglePlay,
     stopPlay,
     seekTo,
